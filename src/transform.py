@@ -3,9 +3,12 @@ Fase TRANSFORM: limpia y transforma datos de productos y carritos.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Tuple
 
 import pandas as pd
+
+from src.config import PROCESSED_CSV
 
 
 def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
@@ -134,6 +137,13 @@ def transform_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     print(f"  Carritos: {stats['carts']['unique_carts']}")
     print(f"  Ingresos: ${stats['carts']['total_revenue']:.2f}")
     print(f"  Ingresos Perdidos: ${stats['carts']['lost_revenue']:.2f}")
+
+    # Guardar dataset limpio en data/processed
+    if amazon_transformed is not None:
+        out_path = Path(PROCESSED_CSV)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        amazon_transformed.to_csv(out_path, index=False)
+        print(f"[TRANSFORM] Dataset procesado guardado en {out_path}")
 
     return amazon_transformed, cart_transformed
 

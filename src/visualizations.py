@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json
+from pathlib import Path
 from src.config import get_mongo_connection, get_redis_connection
 from pathlib import Path
 
@@ -13,8 +14,83 @@ from pathlib import Path
 Path("data/processed").mkdir(parents=True, exist_ok=True)
 
 
+<<<<<<< HEAD
 def plot_top_selling_products():
     """Gráfico de productos más vendidos."""
+=======
+def plot_product_categories_distribution():
+    """Gráfico de distribución de productos por categoría."""
+    try:
+        _, _, collection = get_mongo_connection()
+        if collection is None:
+            return
+
+        # Agregación por categoría (Amazon no tiene campo brand)
+        pipeline = [
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 15},
+        ]
+
+        results = list(collection.aggregate(pipeline))
+
+        if not results:
+            print("[VIZ] No hay datos de productos")
+            return
+
+        categories = [r["_id"] for r in results]
+        counts = [r["count"] for r in results]
+
+        # Crear directorio si no existe
+        Path("docs/images").mkdir(parents=True, exist_ok=True)
+
+        plt.figure(figsize=(12, 6))
+        plt.barh(categories, counts, color="steelblue")
+        plt.xlabel("Cantidad de Productos")
+        plt.title("Top 15 Categorías por Cantidad de Productos - Amazon")
+        plt.tight_layout()
+        plt.savefig("docs/images/categories_distribution.png", dpi=100, bbox_inches="tight")
+        print("[VIZ] Gráfico guardado: docs/images/categories_distribution.png")
+        plt.close()
+
+    except Exception as e:
+        print(f"[VIZ] Error en gráfico de categorías: {e}")
+
+
+def plot_price_distribution():
+    """Gráfico de distribución de precios."""
+    try:
+        _, _, collection = get_mongo_connection()
+        if collection is None:
+            return
+
+        # Obtener precios
+        prices = [doc["discounted_price"] for doc in collection.find({}, {"discounted_price": 1}) if doc.get("discounted_price", 0) > 0]
+
+        if not prices:
+            print("[VIZ] No hay datos de precios")
+            return
+
+        # Crear directorio si no existe
+        Path("docs/images").mkdir(parents=True, exist_ok=True)
+
+        plt.figure(figsize=(12, 6))
+        plt.hist(prices, bins=50, color="coral", edgecolor="black", alpha=0.7)
+        plt.xlabel("Precio Descuentado (Rupias)")
+        plt.ylabel("Cantidad de Productos")
+        plt.title("Distribución de Precios - Amazon")
+        plt.tight_layout()
+        plt.savefig("docs/images/price_distribution.png", dpi=100, bbox_inches="tight")
+        print("[VIZ] Gráfico guardado: docs/images/price_distribution.png")
+        plt.close()
+
+    except Exception as e:
+        print(f"[VIZ] Error en distribución de precios: {e}")
+
+
+def plot_cart_events_timeline():
+    """Gráfico de eventos de carrito en tiempo."""
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
     try:
         redis_client = get_redis_connection()
         _, _, collection = get_mongo_connection()
@@ -28,6 +104,7 @@ def plot_top_selling_products():
         
         for key in cart_keys:
             cart_data = redis_client.hgetall(key)
+<<<<<<< HEAD
             events = json.loads(cart_data.get("events", "[]"))
             
             for event in events:
@@ -55,6 +132,33 @@ def plot_top_selling_products():
         plt.tight_layout()
         plt.savefig("data/processed/top_selling_products.png", dpi=100, bbox_inches="tight")
         print("[VIZ] ✅ Gráfico guardado: top_selling_products.png")
+=======
+            try:
+                events = json.loads(cart_data.get("events", "[]"))
+                for event in events:
+                    event_type = event.get("event_type", "unknown")
+                    if event_type in events_by_type:
+                        events_by_type[event_type] += 1
+            except:
+                pass
+
+        if sum(events_by_type.values()) == 0:
+            print("[VIZ] No hay eventos de carrito")
+            return
+
+        # Crear directorio si no existe
+        Path("docs/images").mkdir(parents=True, exist_ok=True)
+
+        plt.figure(figsize=(10, 6))
+        colors = ["#2ecc71", "#3498db", "#e74c3c", "#f39c12"]
+        plt.bar(events_by_type.keys(), events_by_type.values(), color=colors)
+        plt.xlabel("Tipo de Evento")
+        plt.ylabel("Cantidad de Eventos")
+        plt.title("Eventos de Carrito - Cyberday Amazon")
+        plt.tight_layout()
+        plt.savefig("docs/images/cart_events.png", dpi=100, bbox_inches="tight")
+        print("[VIZ] Gráfico guardado: docs/images/cart_events.png")
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
         plt.close()
 
         redis_client.close()
@@ -233,15 +337,30 @@ def plot_revenue_comparison():
 
         for key in cart_keys:
             cart_data = redis_client.hgetall(key)
+<<<<<<< HEAD
             total_revenue += float(cart_data.get("total_revenue", 0))
             total_lost += float(cart_data.get("lost_revenue", 0))
+=======
+            revenue = float(cart_data.get("total_revenue", 0))
+            lost = float(cart_data.get("lost_revenue", 0))
+
+            total_revenue += revenue
+            lost_revenue += lost
+
+            if revenue > 0:
+                revenue_by_cart.append(revenue)
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
 
         if total_revenue == 0 and total_lost == 0:
             print("[VIZ] No hay datos de ingresos")
             return
 
+        # Crear directorio si no existe
+        Path("docs/images").mkdir(parents=True, exist_ok=True)
+
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
+<<<<<<< HEAD
         # Gráfico 1: Barras comparativas
         categories = ["Ingresos\nObtenidos", "Ingresos\nPerdidos"]
         values = [total_revenue, total_lost]
@@ -256,6 +375,14 @@ def plot_revenue_comparison():
             ax1.text(bar.get_x() + bar.get_width()/2., height,
                     f'₹{int(height):,}',
                     ha='center', va='bottom', fontweight='bold')
+=======
+        # Gráfico 1: Ingresos vs Perdidos
+        ax1.bar(["Ingresos", "Perdidos"], [total_revenue, lost_revenue], color=["#27ae60", "#e74c3c"])
+        ax1.set_ylabel("Rupias")
+        ax1.set_title("Ingresos Totales vs Perdidos - Amazon")
+        for i, v in enumerate([total_revenue, lost_revenue]):
+            ax1.text(i, v + 100, f"${v:.0f}", ha="center", va="bottom", fontweight="bold")
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
 
         # Gráfico 2: Pie chart
         total = total_revenue + total_lost
@@ -266,8 +393,13 @@ def plot_revenue_comparison():
         ax2.set_title("Distribución de Ingresos Potenciales")
 
         plt.tight_layout()
+<<<<<<< HEAD
         plt.savefig("data/processed/revenue_comparison.png", dpi=100, bbox_inches="tight")
         print("[VIZ] ✅ Gráfico guardado: revenue_comparison.png")
+=======
+        plt.savefig("docs/images/revenue_metrics.png", dpi=100, bbox_inches="tight")
+        print("[VIZ] Gráfico guardado: docs/images/revenue_metrics.png")
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
         plt.close()
 
         redis_client.close()
@@ -278,6 +410,7 @@ def plot_revenue_comparison():
 
 def generate_all_visualizations():
     """Genera todas las visualizaciones."""
+<<<<<<< HEAD
     print("\n[VIZ] 📊 Generando visualizaciones del Cyberday...\n")
     
     plot_top_selling_products()
@@ -287,6 +420,16 @@ def generate_all_visualizations():
     plot_revenue_comparison()
     
     print("\n[VIZ] ✅ Todas las visualizaciones completadas\n")
+=======
+    print("\n[VIZ] Generando visualizaciones del Cyberday Amazon...\n")
+
+    plot_product_categories_distribution()
+    plot_price_distribution()
+    plot_cart_events_timeline()
+    plot_revenue_metrics()
+
+    print("\n[VIZ] Todas las visualizaciones completadas\n")
+>>>>>>> 39657b909867f9fac9acf91ee8cd065246ecf4cc
 
 
 if __name__ == "__main__":

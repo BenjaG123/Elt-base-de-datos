@@ -6,6 +6,7 @@ from pymongo import MongoClient
 import redis
 
 # ===== CONFIGURACION MONGODB =====
+# Aca se guardan los datos de productos ya limpios
 MONGO_URI = "mongodb://localhost:27017/"
 MONGO_DB = "amazon_db"
 MONGO_COLLECTION = "amazon_products"
