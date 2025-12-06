@@ -116,7 +116,7 @@ flipkart_df, redis_cart_df = extract_all()
 flipkart_tf, cart_tf = transform_all()
 
 # Cargar
-load_all(simulate_realtime=False)
+load_all(products_df, carts_df)
 
 # Analizar
 report = integration_all()

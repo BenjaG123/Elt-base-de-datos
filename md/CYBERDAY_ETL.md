@@ -354,7 +354,7 @@ Asegúrate de que los archivos están en:
 ### Caso 1: Simular Cyberday
 ```python
 from src.load import load_all
-load_all(simulate_realtime=True)
+load_all(products_df, carts_df)
 ```
 
 ### Caso 2: Analizar conversiones
