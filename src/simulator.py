@@ -144,7 +144,7 @@ class CyberdaySimulator:
                 # Stock disponible - decisión aleatoria
                 action = random.choices(
                     ['checkout', 'add', 'abandon'],
-                    weights=[0.6, 0.3, 0.1],  # 60% checkout, 30% add, 10% abandon
+                    weights=[0.4, 0.3, 0.3],  # 40% checkout, 30% add, 30% abandon
                     k=1
                 )[0]
                 
@@ -167,7 +167,7 @@ class CyberdaySimulator:
                     event_type = "abandon"
                     stock_after = available_stock
                     revenue = 0
-                    lost_revenue = 0
+                    lost_revenue = price * quantity
             
             # Crear evento
             event = {
