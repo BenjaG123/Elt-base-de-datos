@@ -16,13 +16,10 @@ import sys
 from datetime import datetime
 
 # Importar módulos del pipeline
-from src.extract import extract_all
 from src.config import get_mongo_connection, get_redis_connection
-from src.transform import transform_all, get_transformation_stats
-from src.load import load_all
-from src.simulator import run_simulation
-from src.integration import integration_all
-from src.visualizations import generate_all_visualizations
+from src.core import integration_all, run_simulation
+from src.etl import extract_all, get_transformation_stats, load_all, transform_all
+from src.visualization import generate_all_visualizations
 
 def print_header(title: str):
     """Imprime encabezado formateado."""

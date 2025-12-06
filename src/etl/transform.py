@@ -21,12 +21,16 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 
-from src.extract import extract_all
+from src.etl.extract import extract_all
+from src.utils import (
+    clean_percentage_column,
+    clean_price_column,
+    safe_numeric_conversion,
+)
 
 # ========================================================================
 # CONSTANTES DE VALIDACIÓN DE NEGOCIO
 # ========================================================================
-# Rangos válidos para métricas de productos y carritos
 
 # Ratings de productos (sistema de 5 estrellas)
 MIN_RATING = 0.0
@@ -42,56 +46,6 @@ MAX_QUANTITY = 100
 
 # Valores por defecto
 DEFAULT_CATEGORY = "Uncategorized"
-
-
-# ========================================================================
-# FUNCIONES HELPER PRIVADAS
-# ========================================================================
-
-
-def _clean_price_column(series: pd.Series) -> pd.Series:
-    """
-    Limpia una columna de precios removiendo símbolos y comas.
-
-    Args:
-        series: Serie de pandas con valores de precio
-
-    Returns:
-        Serie con precios limpios convertidos a float
-    """
-    return (
-        series.astype(str)
-        .str.replace("₹", "", regex=False)
-        .str.replace(",", "", regex=False)
-        .str.strip()
-    )
-
-
-def _clean_percentage_column(series: pd.Series) -> pd.Series:
-    """
-    Limpia una columna de porcentajes removiendo el símbolo %.
-
-    Args:
-        series: Serie de pandas con valores de porcentaje
-
-    Returns:
-        Serie con porcentajes limpios
-    """
-    return series.astype(str).str.replace("%", "", regex=False).str.strip()
-
-
-def _safe_numeric_conversion(series: pd.Series, default: float = 0) -> pd.Series:
-    """
-    Convierte una serie a numérico de forma segura.
-
-    Args:
-        series: Serie de pandas a convertir
-        default: Valor por defecto para valores inválidos
-
-    Returns:
-        Serie convertida a numérico
-    """
-    return pd.to_numeric(series, errors="coerce").fillna(default)
 
 
 # ========================================================================
@@ -120,11 +74,7 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
         return None
 
     df = df.copy()
-
-    # Eliminar columna 'brand' - no requerida para análisis de productos
-    if "brand" in df.columns:
-        df = df.drop(columns=["brand"])
-
+    
     # Validación de integridad: eliminar registros sin identificadores críticos
     # Paso 1: Remover filas con valores NaN/None en campos obligatorios
     df = df.dropna(subset=["product_name", "product_id"])
@@ -148,20 +98,20 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
 
     # Normalización de valores faltantes con valores por defecto semánticamente correctos
     df["category"] = df["category"].fillna(DEFAULT_CATEGORY)
-    df["rating"] = _safe_numeric_conversion(df["rating"], default=0)
-    df["rating_count"] = _safe_numeric_conversion(df["rating_count"], default=0)
+    df["rating"] = safe_numeric_conversion(df["rating"], default=0)
+    df["rating_count"] = safe_numeric_conversion(df["rating_count"], default=0)
     df["about_product"] = df["about_product"].fillna("")
 
     # Limpieza y conversión de columnas monetarias
     # Remueve símbolos de moneda (₹), separadores de miles (,) y convierte a float
-    df["actual_price"] = _safe_numeric_conversion(
-        _clean_price_column(df["actual_price"]), default=0
+    df["actual_price"] = safe_numeric_conversion(
+        clean_price_column(df["actual_price"]), default=0
     )
-    df["discounted_price"] = _safe_numeric_conversion(
-        _clean_price_column(df["discounted_price"]), default=0
+    df["discounted_price"] = safe_numeric_conversion(
+        clean_price_column(df["discounted_price"]), default=0
     )
-    df["discount_percentage"] = _safe_numeric_conversion(
-        _clean_percentage_column(df["discount_percentage"]), default=0
+    df["discount_percentage"] = safe_numeric_conversion(
+        clean_percentage_column(df["discount_percentage"]), default=0
     )
 
     # Validación de rangos: aplicar límites de negocio a valores numéricos
@@ -202,16 +152,16 @@ def transform_redis_carts(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
 
     # Validación de cantidades: asegurar valores dentro de límites de negocio
     # Rango permitido: 1-100 unidades por transacción
-    df["quantity"] = _safe_numeric_conversion(df["quantity"], default=MIN_QUANTITY).astype(int)
+    df["quantity"] = safe_numeric_conversion(df["quantity"], default=MIN_QUANTITY).astype(int)
     df["quantity"] = df["quantity"].clip(lower=MIN_QUANTITY, upper=MAX_QUANTITY)
 
     # Conversión de métricas de inventario y financieras
     # Stock: valores enteros no negativos
     # Revenue: valores flotantes para precisión monetaria
-    df["stock_before"] = _safe_numeric_conversion(df["stock_before"], default=0).astype(int)
-    df["stock_after"] = _safe_numeric_conversion(df["stock_after"], default=0).astype(int)
-    df["revenue"] = _safe_numeric_conversion(df["revenue"], default=0).astype(float)
-    df["lost_revenue"] = _safe_numeric_conversion(df["lost_revenue"], default=0).astype(float)
+    df["stock_before"] = safe_numeric_conversion(df["stock_before"], default=0).astype(int)
+    df["stock_after"] = safe_numeric_conversion(df["stock_after"], default=0).astype(int)
+    df["revenue"] = safe_numeric_conversion(df["revenue"], default=0).astype(float)
+    df["lost_revenue"] = safe_numeric_conversion(df["lost_revenue"], default=0).astype(float)
 
     print(f"[TRANSFORM] {len(df)} eventos de carrito transformados")
     return df
@@ -290,5 +240,10 @@ def transform_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     return amazon_transformed, cart_transformed
 
 
-if __name__ == "__main__":
+def main():
+    """Ejecuta el módulo TRANSFORM de manera independiente."""
     transform_all()
+
+
+if __name__ == "__main__":
+    main()

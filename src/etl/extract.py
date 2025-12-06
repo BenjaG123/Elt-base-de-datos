@@ -50,5 +50,10 @@ def extract_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     return amazon_df, redis_cart_df
 
 
-if __name__ == "__main__":
+def main():
+    """Ejecuta el módulo EXTRACT de manera independiente."""
     extract_all()
+
+
+if __name__ == "__main__":
+    main()

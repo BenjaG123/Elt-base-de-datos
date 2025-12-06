@@ -1,0 +1,136 @@
+📁 ESTRUCTURA DEL PROYECTO ETL - CYBER DAY
+═══════════════════════════════════════════════════════════════
+
+Elt-base-de-datos/
+│
+├── 📂 src/                          # Código fuente principal
+│   │
+│   ├── 🔄 etl/                      # Pipeline ETL (Extract-Transform-Load)
+│   │   ├── __init__.py
+│   │   ├── extract.py               # ← EXTRACT: Lee CSVs
+│   │   ├── transform.py             # ← TRANSFORM: Limpia datos
+│   │   └── load.py                  # ← LOAD: Guarda en BD + CSV
+│   │
+│   ├── ⚙️ core/                      # Lógica de negocio
+│   │   ├── __init__.py
+│   │   ├── simulator.py             # Simulador de Cyber Day
+│   │   ├── integration.py           # Análisis cruzado MongoDB/Redis
+│   │   └── analytics.py             # Métricas y KPIs
+│   │
+│   ├── 🔍 queries/                   # Consultas independientes
+│   │   ├── __init__.py
+│   │   ├── mongo_queries.py         # Consultas directas a MongoDB
+│   │   └── redis_queries.py         # Consultas directas a Redis
+│   │
+│   ├── 📊 visualization/            # Gráficos y reportes
+│   │   ├── __init__.py
+│   │   └── charts.py                # Generación de visualizaciones
+│   │
+│   ├── 🛠️ utils/                     # Utilidades compartidas
+│   │   ├── __init__.py
+│   │   └── helpers.py               # Funciones auxiliares
+│   │
+│   ├── ⚙️ config/                    # Configuraciones
+│   │   ├── __init__.py
+│   │   └── database.py              # Conexiones MongoDB/Redis
+│   │
+│   └── __init__.py
+│
+├── 📂 data/                         # Datos del proyecto
+│   ├── raw/                         # Datos crudos
+│   │   ├── amazon.csv
+│   │   └── redis_cart_sim.csv
+│   ├── processed/                   # Datos procesados
+│   │   ├── amazon_processed.csv
+│   │   └── carts_processed.csv
+│   └── output/                      # Visualizaciones generadas
+│       └── *.png
+│
+├── 📂 tests/                        # Tests unitarios
+│   ├── test_etl/
+│   ├── test_core/
+│   └── test_utils/
+│
+├── 📂 docs/                         # Documentación
+│   ├── ESTRUCTURA.md
+│   └── architecture.md
+│
+├── 📂 scripts/                      # Scripts auxiliares
+│   ├── setup_databases.py
+│   └── clean_data.py
+│
+├── 📂 req/                          # Requisitos académicos
+│   └── Proyecto Final.pdf
+│
+├── 🚀 main.py                       # Entry point del pipeline
+├── 📄 requirements.txt              # Dependencias
+└── 📖 README.md                     # Documentación principal
+
+
+═══════════════════════════════════════════════════════════════
+🎯 PRINCIPIOS DE DISEÑO APLICADOS
+═══════════════════════════════════════════════════════════════
+
+✅ SRP (Single Responsibility Principle)
+   Cada módulo tiene una sola responsabilidad clara
+
+✅ Separation of Concerns
+   ETL / Lógica de negocio / Visualización / Utilidades
+
+✅ DRY (Don't Repeat Yourself)
+   Helpers centralizados y reutilizables
+
+✅ Modularidad
+   Fácil extensión sin modificar código existente
+
+✅ Testabilidad
+   Estructura facilita tests unitarios
+
+✅ Escalabilidad
+   Preparado para crecer
+
+
+═══════════════════════════════════════════════════════════════
+📦 IMPORTS SIMPLIFICADOS
+═══════════════════════════════════════════════════════════════
+
+# ETL
+from src.etl import extract_all, transform_all, load_all
+
+# Core Business Logic
+from src.core import run_simulation, integration_all
+
+# Queries (Consultas Independientes)
+from src.queries import get_all_products, get_product_by_id
+from src.queries import get_cart_by_id, get_all_cart_ids
+
+# Visualizations
+from src.visualization import generate_all_visualizations
+
+# Config
+from src.config import get_mongo_connection, get_redis_connection
+
+# Utils
+from src.utils import safe_float_conversion, clean_price_column
+
+
+═══════════════════════════════════════════════════════════════
+🔄 FLUJO DE EJECUCIÓN
+═══════════════════════════════════════════════════════════════
+
+main.py
+   │
+   ├─→ [1] src.config (Verificar conexiones)
+   ├─→ [2] src.etl.extract (Leer CSVs)
+   ├─→ [3] src.etl.transform (Limpiar datos)
+   ├─→ [4] src.etl.load (Guardar en MongoDB/Redis/CSV)
+   ├─→ [5] src.core.simulator (Simular Cyber Day)
+   ├─→ [6] src.core.integration (Análisis cruzado)
+   └─→ [7] src.visualization (Generar gráficos)
+
+
+═══════════════════════════════════════════════════════════════
+Autor: ETL Team
+Versión: 2.0 - Estructura refactorizada
+Fecha: Diciembre 2025
+═══════════════════════════════════════════════════════════════

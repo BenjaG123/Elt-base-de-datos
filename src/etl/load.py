@@ -21,12 +21,12 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
 from src.config import PROCESSED_CSV, get_mongo_connection, get_redis_connection
-from src.transform import transform_all
+from src.etl.transform import transform_all
+from src.utils import safe_float_conversion, safe_int_conversion, save_dataframe_to_csv
 
 # ========================================================================
 # CONSTANTES DE NEGOCIO
@@ -37,71 +37,6 @@ DEFAULT_STOCK = 100
 
 # Ventas iniciales para nuevos productos
 DEFAULT_SALES = 0
-
-
-# ========================================================================
-# FUNCIONES HELPER PRIVADAS
-# ========================================================================
-
-
-def _safe_float_conversion(value, default: float = 0.0) -> float:
-    """
-    Convierte un valor a float de forma segura.
-
-    Args:
-        value: Valor a convertir
-        default: Valor por defecto si la conversión falla
-
-    Returns:
-        Valor convertido a float o default
-    """
-    if pd.notna(value):
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return default
-    return default
-
-
-def _safe_int_conversion(value, default: int = 0) -> int:
-    """
-    Convierte un valor a int de forma segura.
-
-    Args:
-        value: Valor a convertir
-        default: Valor por defecto si la conversión falla
-
-    Returns:
-        Valor convertido a int o default
-    """
-    if pd.notna(value):
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return default
-    return default
-
-
-def _save_to_csv(df: pd.DataFrame, filename: str) -> bool:
-    """
-    Guarda un DataFrame en CSV para auditoría.
-
-    Args:
-        df: DataFrame a guardar
-        filename: Nombre del archivo (sin ruta)
-
-    Returns:
-        True si se guardó exitosamente, False en caso contrario
-    """
-    try:
-        out_path = Path(PROCESSED_CSV).parent / filename
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out_path, index=False)
-        print(f"[LOAD] Dataset guardado en {out_path}")
-        return True
-    except Exception as e:
-        print(f"[LOAD] Error guardando CSV: {e}")
-        return False
 
 
 # ========================================================================
@@ -144,11 +79,11 @@ def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
                 "product_id": record.get("product_id"),
                 "product_name": record.get("product_name"),
                 "category": record.get("category"),
-                "actual_price": _safe_float_conversion(record.get("actual_price")),
-                "discounted_price": _safe_float_conversion(record.get("discounted_price")),
-                "discount_percentage": _safe_float_conversion(record.get("discount_percentage")),
-                "rating": _safe_float_conversion(record.get("rating")),
-                "rating_count": _safe_int_conversion(record.get("rating_count")),
+                "actual_price": safe_float_conversion(record.get("actual_price")),
+                "discounted_price": safe_float_conversion(record.get("discounted_price")),
+                "discount_percentage": safe_float_conversion(record.get("discount_percentage")),
+                "rating": safe_float_conversion(record.get("rating")),
+                "rating_count": safe_int_conversion(record.get("rating_count")),
                 "about_product": record.get("about_product", ""),
                 # Campos de negocio para el inventario
                 "stock": DEFAULT_STOCK,
@@ -166,7 +101,7 @@ def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
         )
 
         # Guardar copia en CSV para auditoría
-        _save_to_csv(df, "amazon_processed.csv")
+        save_dataframe_to_csv(df, Path(PROCESSED_CSV).parent, "amazon_processed.csv")
 
         return True
 
@@ -225,17 +160,17 @@ def load_carts_to_redis(df: pd.DataFrame) -> bool:
                 "event_time": str(record["event_time"]),
                 "event_type": record["event_type"],
                 "product_id": record["product_id"],
-                "quantity": _safe_int_conversion(record["quantity"]),
-                "stock_before": _safe_int_conversion(record["stock_before"]),
-                "stock_after": _safe_int_conversion(record["stock_after"]),
-                "revenue": _safe_float_conversion(record["revenue"]),
-                "lost_revenue": _safe_float_conversion(record["lost_revenue"]),
+                "quantity": safe_int_conversion(record["quantity"]),
+                "stock_before": safe_int_conversion(record["stock_before"]),
+                "stock_after": safe_int_conversion(record["stock_after"]),
+                "revenue": safe_float_conversion(record["revenue"]),
+                "lost_revenue": safe_float_conversion(record["lost_revenue"]),
             }
 
             # Agregar evento y acumular métricas
             carts[cart_id]["events"].append(event)
-            carts[cart_id]["total_revenue"] += _safe_float_conversion(record["revenue"])
-            carts[cart_id]["lost_revenue"] += _safe_float_conversion(record["lost_revenue"])
+            carts[cart_id]["total_revenue"] += safe_float_conversion(record["revenue"])
+            carts[cart_id]["lost_revenue"] += safe_float_conversion(record["lost_revenue"])
 
         # Persistir carritos en Redis como hash keys
         # Formato: cart:{cart_id} -> {customer_id, events, total_revenue, lost_revenue}
@@ -254,7 +189,7 @@ def load_carts_to_redis(df: pd.DataFrame) -> bool:
         print(f"[LOAD] {len(carts)} carritos cargados a Redis")
 
         # Guardar copia en CSV para auditoría
-        _save_to_csv(df, "carts_processed.csv")
+        save_dataframe_to_csv(df, Path(PROCESSED_CSV).parent, "carts_processed.csv")
 
         return True
 
@@ -317,7 +252,8 @@ def load_all(amazon_df: pd.DataFrame, cart_df: pd.DataFrame) -> bool:
     return mongo_ok and redis_ok
 
 
-if __name__ == "__main__":
+def main():
+    """Ejecuta el módulo LOAD de manera independiente."""
     print("[LOAD] Obteniendo datos transformados...")
     transform_result = transform_all()
     if transform_result is None:
@@ -326,3 +262,7 @@ if __name__ == "__main__":
 
     products_df, carts_df = transform_result
     load_all(products_df, carts_df)
+
+
+if __name__ == "__main__":
+    main()
