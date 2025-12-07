@@ -33,7 +33,7 @@ from src.utils import safe_float_conversion, safe_int_conversion, save_dataframe
 # ========================================================================
 
 # Stock inicial para productos nuevos
-DEFAULT_STOCK = 100
+DEFAULT_STOCK = 5
 
 # Ventas iniciales para nuevos productos
 DEFAULT_SALES = 0
