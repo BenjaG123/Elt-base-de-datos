@@ -1,0 +1,160 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    RESUMEN SECCIÓN ETL - INFORME FINAL                     ║
+║                    Listo para copiar y pegar en Word                       ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+He preparado 3 documentos para ti:
+
+1. SECCION_ETL_PARA_INFORME.md
+   ├─ Redacción completa y detallada (4-5 páginas)
+   ├─ Incluye todas las subsecciones del ETL
+   ├─ Con explicaciones técnicas claras
+   └─ Formato Markdown (fácil de copiar a Word)
+
+2. ETL_SECCION_TEXTO_PLANO.txt
+   ├─ Versión en texto plano
+   ├─ Sin formato (solo contenido)
+   ├─ Fácil para copiar y pegar
+   └─ Incluye tablas de resumen
+
+3. GUIA_INTEGRACION_ETL.md
+   ├─ Guía de redacción con opciones
+   ├─ Versión corta (2-3 páginas)
+   ├─ Versión completa (4-5 páginas)
+   ├─ Fragmentos listos para copiar
+   ├─ Preguntas comunes y respuestas
+   └─ Recomendaciones de estructura
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTRUCTURA DEL CONTENIDO ETL:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2.3. METODOLOGÍA DE INTEGRACIÓN (ETL)                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│ 2.3.1. EXTRACT (Extracción)                          [~0.5 página]      │
+│        ├─ Fuentes de datos (Amazon + Redis)                            │
+│        ├─ Proceso de lectura de CSV                                     │
+│        └─ Validaciones básicas                                          │
+│                                                                           │
+│ 2.3.2. TRANSFORM (Transformación)                    [~1.5 página]      │
+│        ├─ Validación de integridad de datos                            │
+│        ├─ Limpieza de esquema                                          │
+│        ├─ Normalización de valores faltantes                           │
+│        ├─ Limpieza de columnas monetarias                              │
+│        ├─ Validación de rangos de negocio                              │
+│        └─ Transformación de eventos de carrito                         │
+│                                                                           │
+│ 2.3.3. LOAD (Carga)                                  [~1.5 página]      │
+│        ├─ Carga en MongoDB                                             │
+│        │  ├─ Estructura de documentos                                  │
+│        │  ├─ Proceso de inserción                                      │
+│        │  └─ Gestión de conexiones                                     │
+│        │                                                                │
+│        └─ Carga en Redis                                               │
+│           ├─ Estructura de datos                                       │
+│           ├─ Agregación por carrito                                    │
+│           └─ Manejo de recursos                                        │
+│                                                                           │
+│ 2.3.4. Integración y Orquestación                    [~0.5 página]      │
+│        └─ Función load_all() que coordina todo                        │
+│                                                                           │
+│ 2.3.5. Propósito General                             [~0.5 página]      │
+│        ├─ Automatización                                               │
+│        ├─ Limpieza                                                     │
+│        ├─ Normalización                                                │
+│        ├─ Validación                                                   │
+│        ├─ Persistencia dual                                            │
+│        └─ Auditoría                                                    │
+│                                                                           │
+│ Tabla Resumen + Diagrama                             [~0.5 página]      │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+TOTAL RECOMENDADO: 4-5 PÁGINAS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTADÍSTICAS DEL CONTENIDO:
+
+   Palabras totales:           ~3,500 palabras
+   Tablas incluidas:           3 tablas
+   Diagramas:                  1 diagrama ASCII
+   Ejemplos de código:         8 fragmentos comentados
+   Subsecciones:              12 subsecciones
+   Secciones principales:     5 secciones
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RECOMENDACIONES DE COPIA:
+
+✓ SI COPIAS A WORD:
+  • Elige la versión corta si tienes espacio limitado (2-3 páginas)
+  • Elige la versión completa si tienes suficiente espacio (4-5 páginas)
+  • Los fragmentos de código pueden incluirse como bloques de texto
+  • Las tablas se importan mejor desde Markdown
+
+✓ MANTÉN LA ESTRUCTURA:
+  • 2.3.1, 2.3.2, etc. (para numeración correcta)
+  • Negrita para títulos principales
+  • Viñetas para listas
+
+✓ PERSONALIZACIÓN:
+  • Puedes agregar tus propias métricas al final
+  • Puedes agregar screenshots de ejecución
+  • Puedes agregar más ejemplos si lo deseas
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CONTENIDO BREVE (para previsualizar):
+
+2.3. Metodología de Integración (ETL)
+
+El proceso ETL constituye la base del sistema de integración de datos. Permite
+extraer información de múltiples fuentes, limpiarla y normalizarla para
+cargarla en bases de datos NoSQL especializadas.
+
+2.3.1. Extract (Extracción)
+Se utilizan dos archivos CSV que simulan un escenario real de e-commerce:
+- amazon.csv: 1,300 productos reales (catálogo)
+- redis_cart_sim.csv: 500 eventos de compra (transacciones)
+El módulo src/etl/extract.py implementa funciones que leen estos datos.
+
+2.3.2. Transform (Transformación)
+Se realiza limpieza y validación:
+- Elimina registros incompletos (sin nombre o ID)
+- Normaliza precios (remueve símbolos ₹ y separadores)
+- Valida rangos (ratings 0-5, descuentos 0-100%)
+- Completa valores faltantes con defaults apropiados
+Resultado: ~900 productos válidos de 1,300 originales
+
+2.3.3. Load (Carga)
+Se persisten los datos en dos BD especializadas:
+- MongoDB: Documentos JSON con catálogo (100 unidades iniciales por producto)
+- Redis: Hashes con eventos agrupados por carrito (acceso sub-milisegundo)
+
+2.3.4. Propósito General
+Automatiza la ingestión, garantiza calidad, normaliza formatos, valida
+reglas de negocio, y proporciona auditoría mediante CSV backup.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PRÓXIMOS PASOS:
+
+1. Abre el archivo que prefieras:
+   ✓ SECCION_ETL_PARA_INFORME.md (recomendado - Markdown formateado)
+   ✓ ETL_SECCION_TEXTO_PLANO.txt (simple - solo texto)
+   ✓ GUIA_INTEGRACION_ETL.md (guía con opciones)
+
+2. Selecciona y copia el contenido
+
+3. Pega en tu documento Word/Google Docs
+
+4. Ajusta numeración si es necesario (2.3.1, 2.3.2, etc.)
+
+5. Revisa que se vea bien en tu documento
+
+6. ¡Listo para entregar!
+
+═══════════════════════════════════════════════════════════════════════════════

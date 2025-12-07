@@ -9,11 +9,8 @@ Este módulo implementa la fase T (Transform) del proceso ETL, realizando:
 - Generación de estadísticas de calidad de datos
 
 Fuentes de datos:
-- Amazon Products: Catálogo de productos con precios y ratings
+- Amazon Products: Catálogo de productos con precios y categorías
 - Redis Cart Events: Eventos de carritos de compra en tiempo real
-
-Autor: ETL Team
-Fecha: 2025
 """
 
 from datetime import datetime, timezone
@@ -32,20 +29,9 @@ from src.utils import (
 # CONSTANTES DE VALIDACIÓN DE NEGOCIO
 # ========================================================================
 
-# Ratings de productos (sistema de 5 estrellas)
-MIN_RATING = 0.0
-MAX_RATING = 5.0
-
-# Descuentos promocionales (porcentaje)
-MIN_DISCOUNT = 0.0
-MAX_DISCOUNT = 100.0
-
 # Cantidades por transacción (límites de negocio)
 MIN_QUANTITY = 1
 MAX_QUANTITY = 100
-
-# Valores por defecto
-DEFAULT_CATEGORY = "Uncategorized"
 
 
 # ========================================================================
@@ -58,11 +44,9 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
     Transforma y limpia datos de productos Amazon.
 
     Operaciones realizadas:
-    - Elimina columnas innecesarias (brand, reviews, imágenes)
+    - Elimina columnas innecesarias (reviews, ratings, imágenes)
     - Filtra productos sin nombre o ID
     - Normaliza precios y porcentajes de descuento
-    - Valida rangos de rating y descuentos
-    - Rellena valores faltantes
 
     Args:
         df: DataFrame con datos crudos de productos Amazon
@@ -80,7 +64,6 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
     df = df.dropna(subset=["product_name", "product_id"])
 
     # Paso 2: Filtrar strings vacíos o solo espacios en blanco
-    # Nota: CSV puede contener comillas vacías "" que no son detectadas como NaN
     df = df[df["product_name"].astype(str).str.strip() != ""]
     df = df[df["product_id"].astype(str).str.strip() != ""]
 
@@ -88,18 +71,15 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
     # Estas columnas agregan ruido sin valor para análisis de ventas/carritos
     campos_innecesarios = [
         'user_id', 'user_name', 'review_id', 'review_title',
-        'review_content', 'img_link', 'product_link'
+        'review_content', 'img_link', 'product_link', 'rating', 'rating_count'
     ]
     df = df.drop(
         columns=[col for col in campos_innecesarios if col in df.columns],
         errors='ignore'
     )
-    print("[TRANSFORM] Campos de metadata eliminados (reviews, links, usuarios)")
+    print("[TRANSFORM] Campos de metadata eliminados (reviews, ratings, links, usuarios)")
 
     # Normalización de valores faltantes con valores por defecto semánticamente correctos
-    df["category"] = df["category"].fillna(DEFAULT_CATEGORY)
-    df["rating"] = safe_numeric_conversion(df["rating"], default=0)
-    df["rating_count"] = safe_numeric_conversion(df["rating_count"], default=0)
     df["about_product"] = df["about_product"].fillna("")
 
     # Limpieza y conversión de columnas monetarias
@@ -113,13 +93,6 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
     df["discount_percentage"] = safe_numeric_conversion(
         clean_percentage_column(df["discount_percentage"]), default=0
     )
-
-    # Validación de rangos: aplicar límites de negocio a valores numéricos
-    # Descuentos: 0-100%, Ratings: 0-5 estrellas
-    df["discount_percentage"] = df["discount_percentage"].clip(
-        lower=MIN_DISCOUNT, upper=MAX_DISCOUNT
-    )
-    df["rating"] = df["rating"].clip(lower=MIN_RATING, upper=MAX_RATING)
 
     print(f"[TRANSFORM] {len(df)} productos Amazon transformados")
     return df
@@ -190,7 +163,6 @@ def get_transformation_stats(
             "total": len(amazon_df) if amazon_df is not None else 0,
             "categories": amazon_df["category"].nunique() if amazon_df is not None else 0,
             "avg_discount": amazon_df["discount_percentage"].mean() if amazon_df is not None else 0,
-            "avg_rating": amazon_df["rating"].mean() if amazon_df is not None else 0,
         },
         "carts": {
             "total_events": len(cart_df) if cart_df is not None else 0,
@@ -232,7 +204,7 @@ def transform_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     print("\n[TRANSFORM] Estadisticas:")
     print(f"  Productos: {stats['products']['total']}")
     print(f"  Categorias: {stats['products']['categories']}")
-    print(f"  Rating Promedio: {stats['products']['avg_rating']:.2f}")
+    print(f"  Descuento Promedio: {stats['products']['avg_discount']:.2f}%")
     print(f"  Carritos: {stats['carts']['unique_carts']}")
     print(f"  Ingresos: ${stats['carts']['total_revenue']:.2f}")
     print(f"  Ingresos Perdidos: ${stats['carts']['lost_revenue']:.2f}")

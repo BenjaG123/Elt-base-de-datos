@@ -125,7 +125,7 @@ def main():
     print_header("RESUMEN DEL PIPELINE")
     print(f"Productos Amazon: {stats['products']['total']}")
     print(f"Categorias: {stats['products']['categories']}")
-    print(f"Rating Promedio: {stats['products']['avg_rating']:.2f}")
+    print(f"Descuento Promedio: {stats['products']['avg_discount']:.2f}%")
     print(f"Eventos de Carrito: {stats['carts']['total_events']}")
     print(f"Carritos Unicos: {stats['carts']['unique_carts']}")
     print(f"Clientes: {stats['carts']['unique_customers']}")
