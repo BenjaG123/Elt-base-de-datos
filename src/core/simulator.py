@@ -197,8 +197,8 @@ class CyberdaySimulator:
         
         # Guardar tiempos de agotamiento en Redis si se solicita
         if save_to_redis:
-            self._save_stock_out_times_to_redis(stock_out_times)
-            self._save_events_to_redis(df)
+            self._save_events_to_redis(df)  #  ← PRIMERO los carritos (con flush)
+            self._save_stock_out_times_to_redis(stock_out_times)  # ← DESPUÉS los stock_out
         
         print(f"\n✅ Simulación completada: {len(events)} eventos generados")
         print(f"   Carritos únicos: {df['cart_id'].nunique()}")
