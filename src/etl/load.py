@@ -18,6 +18,7 @@ Fecha: 2025
 """
 
 import json
+import random
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +34,7 @@ from src.utils import safe_float_conversion, safe_int_conversion, save_dataframe
 # ========================================================================
 
 # Stock inicial para productos nuevos
-DEFAULT_STOCK = 5
+DEFAULT_STOCK = 100
 
 # Ventas iniciales para nuevos productos
 DEFAULT_SALES = 0
@@ -86,7 +87,11 @@ def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
                 "rating_count": safe_int_conversion(record.get("rating_count")),
                 "about_product": record.get("about_product", ""),
                 # Campos de negocio para el inventario
-                "stock": DEFAULT_STOCK,
+                "stock": (
+                            random.randint(150, 300) if safe_float_conversion(record.get("discounted_price")) < 500
+                            else random.randint(80, 150) if safe_float_conversion(record.get("discounted_price")) < 2000
+                            else random.randint(30, 100)
+                        ),
                 "total_sales": DEFAULT_SALES,
                 "created_at": datetime.now(timezone.utc),
             }

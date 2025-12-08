@@ -93,7 +93,7 @@ class CyberdaySimulator:
             quantity = random.randint(1, 5)
             
             # Incrementar tiempo
-            current_time += timedelta(seconds=random.randint(1, 30))
+            current_time += timedelta(seconds=random.randint(1, 10))
             
             # Verificar stock disponible
             available_stock = stock_tracker.get(product_id, 0)

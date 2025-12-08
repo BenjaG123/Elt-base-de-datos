@@ -579,7 +579,7 @@ def plot_top_categories():
         plt.figure(figsize=(12, 6))
         bars = plt.bar(range(len(categories)), revenues, color="coral")
         plt.xticks(range(len(categories)), categories, rotation=45, ha="right")
-        plt.ylabel("Revenue total")
+        plt.ylabel("Revenue total (₹)")
         plt.title("Top 10 categorias mas vendidas - Cyber Day")
 
         for bar in bars:
@@ -587,7 +587,7 @@ def plot_top_categories():
             plt.text(
                 bar.get_x() + bar.get_width() / 2.0,
                 height,
-                f"{int(height):,}",
+                f"₹{int(height):,}",
                 ha="center",
                 va="bottom",
                 fontsize=8,
@@ -636,7 +636,7 @@ def plot_lost_revenue_breakdown():
 
         plt.figure(figsize=(10, 6))
         plt.barh(categories, losses, color="#e74c3c")
-        plt.xlabel("Ingresos perdidos")
+        plt.xlabel("Ingresos perdidos (₹)")
         plt.title("Top 10 categorias con mayores perdidas - Cyber Day")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "lost_revenue_by_category.png"
@@ -668,10 +668,10 @@ def plot_stock_out_times():
 
         for key in list(stock_out_keys)[:15]:
             data = redis_client.hgetall(key)
-            duration_min = float(data.get("duration_seconds", 0)) / 60
+            duration_seconds = float(data.get("duration_seconds", 0))
             name = data.get("product_name", "Unknown")[:35]
 
-            times.append(duration_min)
+            times.append(duration_seconds)
             names.append(name)
 
         sorted_data = sorted(zip(times, names))
@@ -679,16 +679,20 @@ def plot_stock_out_times():
         names = [n for _, n in sorted_data]
 
         plt.figure(figsize=(12, 8))
-        bars = plt.barh(names, times, color="#f39c12")
-        plt.xlabel("Tiempo hasta agotarse (minutos)")
+        # Convertir a horas para el eje X
+        times_hours = [t / 3600 for t in times]
+        bars = plt.barh(names, times_hours, color="#f39c12")
+        plt.xlabel("Tiempo hasta agotarse (horas)")
         plt.title("Productos mas cotizados (se agotaron mas rapido)")
 
-        for bar in bars:
+        for bar, seconds in zip(bars, times):
             width = bar.get_width()
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
             plt.text(
                 width,
                 bar.get_y() + bar.get_height() / 2.0,
-                f"{width:.1f} min",
+                f"{hours}h {minutes}min",
                 ha="left",
                 va="center",
                 fontsize=8,
@@ -734,7 +738,7 @@ def plot_revenue_comparison():
         colors = ["#27ae60", "#e74c3c"]
 
         bars = ax1.bar(categories, values, color=colors, alpha=0.7)
-        ax1.set_ylabel("Rupias")
+        ax1.set_ylabel("Rupias (₹)")
         ax1.set_title("Ingresos totales vs perdidos")
 
         for bar in bars:
@@ -742,7 +746,7 @@ def plot_revenue_comparison():
             ax1.text(
                 bar.get_x() + bar.get_width() / 2.0,
                 height,
-                f"{int(height):,}",
+                f"₹{int(height):,}",
                 ha="center",
                 va="bottom",
                 fontweight="bold",

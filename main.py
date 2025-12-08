@@ -92,7 +92,7 @@ def main():
     # ===== ETAPA 4: SIMULATOR =====
     print_header("ETAPA 4: SIMULATOR (Simulacion Cyber Day)")
     try:
-        simulation_df = run_simulation(num_customers=100, num_events=2000, save_csv=True)
+        simulation_df = run_simulation(num_customers=100, num_events=30000, save_csv=True)
         if simulation_df is not None:
             print(f"\n📊 Resumen de Simulacion:")
             print(f"   Total eventos: {len(simulation_df)}")
