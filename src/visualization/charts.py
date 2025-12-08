@@ -666,7 +666,7 @@ def plot_stock_out_times():
         times = []
         names = []
 
-        for key in list(stock_out_keys)[:15]:
+        for key in list(stock_out_keys):
             data = redis_client.hgetall(key)
             duration_seconds = float(data.get("duration_seconds", 0))
             name = data.get("product_name", "Unknown")[:35]
@@ -674,9 +674,16 @@ def plot_stock_out_times():
             times.append(duration_seconds)
             names.append(name)
 
-        sorted_data = sorted(zip(times, names))
-        times = [t for t, _ in sorted_data]
-        names = [n for _, n in sorted_data]
+        # Eliminar duplicados: mantener solo el más rápido por nombre
+        unique_products = {}
+        for time, name in zip(times, names):
+            if name not in unique_products or time < unique_products[name]:
+                unique_products[name] = time
+        
+        # Ordenar y tomar top 15
+        sorted_data = sorted(unique_products.items(), key=lambda x: x[1])[:15]
+        times = [t for _, t in sorted_data]
+        names = [n for n, _ in sorted_data]
 
         plt.figure(figsize=(12, 8))
         # Convertir a horas para el eje X
