@@ -1,41 +1,39 @@
 """
-Configuracion centralizada para MongoDB, Redis y rutas del dataset de Flipkart.
+Centralized configuration for MongoDB, Redis, and dataset paths.
 """
 
 from pymongo import MongoClient
 import redis
 
-# ===== CONFIGURACION MONGODB =====
-# Aca se guardan los datos de productos ya limpios
+# ===== MONGODB CONFIGURATION =====
+# Cleaned Amazon product data is stored here
 MONGO_URI = "mongodb://localhost:27017/"
 MONGO_DB = "amazon_db"
 MONGO_COLLECTION = "amazon_products"
 
 
 def get_mongo_connection(collection_name: str = MONGO_COLLECTION):
-    """Obtiene conexion a MongoDB (coleccion elegible)."""
+    """Gets MongoDB connection (db and collection)."""
     try:
         client = MongoClient(MONGO_URI)
         db = client[MONGO_DB]
         collection = db[collection_name]
 
-        client.server_info()  # Probar conexion
-        print("Conectado a MongoDB")
-
+        client.server_info()  # Test connection
         return client, db, collection
     except Exception as e:
-        print(f"Error conectando a MongoDB: {e}")
+        print(f"Error connecting to MongoDB: {e}")
         return None, None, None
 
 
-# ===== CONFIGURACION REDIS =====
+# ===== REDIS CONFIGURATION =====
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 REDIS_DB = 0
 
 
 def get_redis_connection():
-    """Obtiene conexion a Redis."""
+    """Gets Redis connection."""
     try:
         r = redis.Redis(
             host=REDIS_HOST,
@@ -44,30 +42,28 @@ def get_redis_connection():
             decode_responses=True,
         )
 
-        r.ping()  # Probar conexion
-        print("Conectado a Redis")
-
+        r.ping()  # Test connection
         return r
     except Exception as e:
-        print(f"Error conectando a Redis: {e}")
+        print(f"Error connecting to Redis: {e}")
         return None
 
 
-# ===== RUTAS DE ARCHIVOS =====
+# ===== FILE PATHS =====
 AMAZON_CSV = "data/raw/amazon.csv"
 REDIS_CART_CSV = "data/raw/redis_cart_sim.csv"
 PROCESSED_CSV = "data/processed/amazon_processed.csv"
 
 if __name__ == "__main__":
-    print("Probando configuracion...")
-    print(f"Dataset Amazon: {AMAZON_CSV}")
+    print("Testing configuration...")
+    print(f"Amazon Dataset: {AMAZON_CSV}")
 
-    print("\nProbando conexiones...")
+    print("\nTesting connections...")
 
     mongo_client, mongo_db, mongo_col = get_mongo_connection()
     redis_client = get_redis_connection()
 
     if mongo_client and redis_client:
-        print("\nTodas las conexiones funcionan!")
+        print("\n✅ All connections work!")
     else:
-        print("\nRevisa tu configuracion")
+        print("\n❌ Check your configuration")

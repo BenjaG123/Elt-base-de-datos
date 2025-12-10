@@ -1,8 +1,7 @@
 """
-Paquete CONFIG: Configuraciones del sistema.
+Package CONFIG: System configurations.
 
-Este paquete contiene configuraciones de bases de datos,
-constantes y parámetros del sistema.
+Contains database configurations, constants, and system parameters.
 """
 
 from src.config.database import (

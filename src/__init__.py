@@ -1,6 +1,6 @@
 """
-Pipeline ETL: Cyberday con MongoDB y Redis
-Módulo principal del ETL
+ETL Pipeline: Cyberday with MongoDB and Redis
+Main ETL module
 """
 
 __version__ = "1.0.0"

@@ -1,14 +1,14 @@
 """
-Módulo UTILS: Funciones auxiliares compartidas del pipeline ETL.
+UTILS Module: Shared helper functions for the ETL pipeline.
 
-Este módulo contiene funciones helper reutilizables para:
-- Conversión segura de tipos de datos
-- Limpieza de formatos (precios, porcentajes)
-- Persistencia de archivos
-- Validaciones comunes
+This module contains reusable helper functions for:
+- Safe data type conversion
+- Format cleaning (prices, percentages)
+- File persistence
+- Common validations
 
-Autor: ETL Team
-Fecha: 2025
+Author: ETL Team
+Date: 2025
 """
 
 from pathlib import Path
@@ -18,20 +18,20 @@ import pandas as pd
 
 
 # ========================================================================
-# CONVERSIÓN SEGURA DE TIPOS
+# SAFE TYPE CONVERSION
 # ========================================================================
 
 
 def safe_float_conversion(value, default: float = 0.0) -> float:
     """
-    Convierte un valor a float de forma segura.
+    Safely converts a value to float.
 
     Args:
-        value: Valor a convertir
-        default: Valor por defecto si la conversión falla
+        value: Value to convert
+        default: Default value if conversion fails
 
     Returns:
-        Valor convertido a float o default
+        Converted float value or default
     """
     if pd.notna(value):
         try:
@@ -43,14 +43,14 @@ def safe_float_conversion(value, default: float = 0.0) -> float:
 
 def safe_int_conversion(value, default: int = 0) -> int:
     """
-    Convierte un valor a int de forma segura.
+    Safely converts a value to int.
 
     Args:
-        value: Valor a convertir
-        default: Valor por defecto si la conversión falla
+        value: Value to convert
+        default: Default value if conversion fails
 
     Returns:
-        Valor convertido a int o default
+        Converted int value or default
     """
     if pd.notna(value):
         try:
@@ -62,32 +62,32 @@ def safe_int_conversion(value, default: int = 0) -> int:
 
 def safe_numeric_conversion(series: pd.Series, default: float = 0) -> pd.Series:
     """
-    Convierte una serie a numérico de forma segura.
+    Safely converts a series to numeric.
 
     Args:
-        series: Serie de pandas a convertir
-        default: Valor por defecto para valores inválidos
+        series: Pandas series to convert
+        default: Default value for invalid values
 
     Returns:
-        Serie convertida a numérico
+        Series converted to numeric
     """
     return pd.to_numeric(series, errors="coerce").fillna(default)
 
 
 # ========================================================================
-# LIMPIEZA DE FORMATOS
+# FORMAT CLEANING
 # ========================================================================
 
 
 def clean_price_column(series: pd.Series) -> pd.Series:
     """
-    Limpia una columna de precios removiendo símbolos y comas.
+    Cleans a price column by removing symbols and commas.
 
     Args:
-        series: Serie de pandas con valores de precio
+        series: Pandas series with price values
 
     Returns:
-        Serie con precios limpios
+        Series with cleaned prices
     """
     return (
         series.astype(str)
@@ -99,19 +99,19 @@ def clean_price_column(series: pd.Series) -> pd.Series:
 
 def clean_percentage_column(series: pd.Series) -> pd.Series:
     """
-    Limpia una columna de porcentajes removiendo el símbolo %.
+    Cleans a percentage column by removing the % symbol.
 
     Args:
-        series: Serie de pandas con valores de porcentaje
+        series: Pandas series with percentage values
 
     Returns:
-        Serie con porcentajes limpios
+        Series with cleaned percentages
     """
     return series.astype(str).str.replace("%", "", regex=False).str.strip()
 
 
 # ========================================================================
-# PERSISTENCIA DE DATOS
+# DATA PERSISTENCE
 # ========================================================================
 
 
@@ -121,49 +121,49 @@ def save_dataframe_to_csv(
     filename: str
 ) -> bool:
     """
-    Guarda un DataFrame en CSV.
+    Saves a DataFrame to CSV.
 
     Args:
-        df: DataFrame a guardar
-        output_dir: Directorio de salida
-        filename: Nombre del archivo (sin ruta)
+        df: DataFrame to save
+        output_dir: Output directory
+        filename: Filename (without path)
 
     Returns:
-        True si se guardó exitosamente, False en caso contrario
+        True if saved successfully, False otherwise
     """
     try:
         out_path = Path(output_dir) / filename
         out_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(out_path, index=False)
-        print(f"[UTILS] Dataset guardado en {out_path}")
+        # print(f"[UTILS] Dataset saved to {out_path}")
         return True
     except Exception as e:
-        print(f"[UTILS] Error guardando CSV: {e}")
+        print(f"[UTILS] Error saving CSV: {e}")
         return False
 
 
 # ========================================================================
-# VALIDACIONES
+# VALIDATIONS
 # ========================================================================
 
 
 def validate_dataframe(df: pd.DataFrame, name: str = "DataFrame") -> bool:
     """
-    Valida que un DataFrame no sea None ni esté vacío.
+    Validates that a DataFrame is not None or empty.
 
     Args:
-        df: DataFrame a validar
-        name: Nombre descriptivo para mensajes
+        df: DataFrame to validate
+        name: Descriptive name for messages
 
     Returns:
-        True si el DataFrame es válido, False en caso contrario
+        True if DataFrame is valid, False otherwise
     """
     if df is None:
-        print(f"[UTILS] {name} es None")
+        print(f"[UTILS] Error: {name} is None")
         return False
 
     if df.empty:
-        print(f"[UTILS] {name} está vacío")
+        print(f"[UTILS] Error: {name} is empty")
         return False
 
     return True
@@ -175,14 +175,14 @@ def clip_to_range(
     max_value: float
 ) -> pd.Series:
     """
-    Limita los valores de una serie a un rango específico.
+    Limits the values of a series to a specific range.
 
     Args:
-        series: Serie de pandas
-        min_value: Valor mínimo permitido
-        max_value: Valor máximo permitido
+        series: Pandas series
+        min_value: Minimum allowed value
+        max_value: Maximum allowed value
 
     Returns:
-        Serie con valores dentro del rango
+        Series with values within the range
     """
     return series.clip(lower=min_value, upper=max_value)

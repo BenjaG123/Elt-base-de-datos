@@ -1,8 +1,8 @@
 """
-Paquete VISUALIZATION: Generación de gráficos y reportes.
+VISUALIZATION Package: Chart and report generation.
 
-Este paquete contiene funciones para generar visualizaciones
-de los datos procesados.
+This package contains functions to generate visualizations
+from processed data.
 """
 
 from src.visualization.charts import generate_all_visualizations

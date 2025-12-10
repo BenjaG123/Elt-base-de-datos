@@ -1,20 +1,20 @@
 """
-Módulo LOAD: Persistencia de datos transformados en bases de datos.
+LOAD Module: Persistence of transformed data into databases.
 
-Este módulo implementa la fase L (Load) del proceso ETL, realizando:
-- Persistencia de productos en MongoDB (catálogo)
-- Persistencia de eventos de carrito en Redis (tiempo real)
-- Guardado de datasets procesados en CSV (auditoría)
-- Validación de datos antes de la carga
-- Gestión de conexiones y manejo de errores
+This module implements the L (Load) phase of the ETL process, performing:
+- Persistence of products in MongoDB (catalog)
+- Persistence of cart events in Redis (real-time)
+- Saving processed datasets to CSV (audit)
+- Data validation before loading
+- Connection management and error handling
 
-Destinos de datos:
-- MongoDB: Catálogo de productos con inventario
-- Redis: Eventos de carritos agrupados por sesión
-- CSV: Backup de datos procesados
+Data destinations:
+- MongoDB: Product catalog with inventory
+- Redis: Cart events grouped by session
+- CSV: Backup of processed data
 
-Autor: ETL Team
-Fecha: 2025
+Author: ETL Team
+Date: 2025
 """
 
 import json
@@ -30,50 +30,50 @@ from src.etl.transform import transform_all
 from src.utils import safe_float_conversion, safe_int_conversion, save_dataframe_to_csv
 
 # ========================================================================
-# CONSTANTES DE NEGOCIO
+# BUSINESS CONSTANTS
 # ========================================================================
 
-# Stock inicial para productos nuevos
+# Initial stock for new products
 DEFAULT_STOCK = 100
 
-# Ventas iniciales para nuevos productos
+# Initial sales for new products
 DEFAULT_SALES = 0
 
 
 # ========================================================================
-# FUNCIONES DE CARGA PRINCIPALES
+# MAIN LOAD FUNCTIONS
 # ========================================================================
 
 
 def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
     """
-    Carga productos transformados a MongoDB.
+    Loads transformed products to MongoDB.
 
     Args:
-        df: DataFrame con productos transformados
-        recreate: Si True, limpia la colección antes de cargar
+        df: DataFrame with transformed products
+        recreate: If True, cleans collection before loading
 
     Returns:
-        True si la carga fue exitosa, False en caso contrario
+        True if load was successful, False otherwise
     """
     if df is None or df.empty:
-        print("[LOAD] No hay datos para cargar a MongoDB")
+        print("[LOAD] Error: No data to load to MongoDB")
         return False
 
     client = None
     try:
-        # Establecer conexión con MongoDB
+        # Establish connection with MongoDB
         client, _, collection = get_mongo_connection()
         if collection is None:
             return False
 
-        # Limpiar colección existente si se solicita
+        # Clean existing collection if requested
         if recreate:
             collection.delete_many({})
-            print("[LOAD] Coleccion MongoDB limpiada")
+            # print("[LOAD] MongoDB collection cleaned")
 
-        # Convertir DataFrame a documentos MongoDB usando iteración eficiente
-        # Nota: to_dict('records') es más eficiente que iterrows()
+        # Convert DataFrame to MongoDB documents using efficient iteration
+        # Note: to_dict('records') is more efficient than iterrows()
         products = []
         for record in df.to_dict('records'):
             doc = {
@@ -86,7 +86,7 @@ def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
                 "rating": safe_float_conversion(record.get("rating")),
                 "rating_count": safe_int_conversion(record.get("rating_count")),
                 "about_product": record.get("about_product", ""),
-                # Campos de negocio para el inventario
+                # Business fields for inventory
                 "stock": (
                             random.randint(150, 300) if safe_float_conversion(record.get("discounted_price")) < 500
                             else random.randint(80, 150) if safe_float_conversion(record.get("discounted_price")) < 2000
@@ -97,61 +97,58 @@ def load_products_to_mongodb(df: pd.DataFrame, recreate: bool = True) -> bool:
             }
             products.append(doc)
 
-        # Inserción masiva (más eficiente que inserts individuales)
-        # ordered=False permite continuar si algún documento falla
+        # Bulk insert (more efficient than individual inserts)
+        # ordered=False allows continuing if some document fails
         insert_result = collection.insert_many(products, ordered=False)
-        print(
-            f"[LOAD] {len(insert_result.inserted_ids)} "
-            f"productos cargados a MongoDB"
-        )
+        # print(f"[LOAD] {len(insert_result.inserted_ids)} products loaded to MongoDB")
 
-        # Guardar copia en CSV para auditoría
+        # Save copy to CSV for audit
         save_dataframe_to_csv(df, Path(PROCESSED_CSV).parent, "amazon_processed.csv")
 
         return True
 
     except Exception as e:
-        print(f"[LOAD] Error cargando a MongoDB: {e}")
+        print(f"[LOAD] Error loading to MongoDB: {e}")
         return False
 
     finally:
-        # Asegurar cierre de conexión incluso si hay error
+        # Ensure connection close even if error
         if client is not None:
             client.close()
 
 
 def load_carts_to_redis(df: pd.DataFrame) -> bool:
     """
-    Carga eventos de carrito agrupados por sesión a Redis.
+    Loads cart events grouped by session to Redis.
 
     Args:
-        df: DataFrame con eventos de carrito transformados
+        df: DataFrame with transformed cart events
 
     Returns:
-        True si la carga fue exitosa, False en caso contrario
+        True if load was successful, False otherwise
     """
     if df is None or df.empty:
-        print("[LOAD] No hay datos para cargar a Redis")
+        print("[LOAD] Error: No data to load to Redis")
         return False
 
     redis_client = None
     try:
-        # Establecer conexión con Redis
+        # Establish connection with Redis
         redis_client = get_redis_connection()
         if redis_client is None:
             return False
 
-        # Limpiar base de datos Redis existente
+        # Clean existing Redis database
         redis_client.flushdb()
-        print("[LOAD] Redis limpiado")
+        # print("[LOAD] Redis cleaned")
 
-        # Agrupar eventos por carrito usando iteración eficiente
-        # Estructura: {cart_id: {customer_id, events[], total_revenue, lost_revenue}}
+        # Group events by cart using efficient iteration
+        # Structure: {cart_id: {customer_id, events[], total_revenue, lost_revenue}}
         carts = {}
         for record in df.to_dict('records'):
             cart_id = record["cart_id"]
 
-            # Inicializar carrito si es la primera vez
+            # Initialize cart if first time
             if cart_id not in carts:
                 carts[cart_id] = {
                     "customer_id": record["customer_id"],
@@ -160,7 +157,7 @@ def load_carts_to_redis(df: pd.DataFrame) -> bool:
                     "lost_revenue": 0,
                 }
 
-            # Crear evento con datos del registro
+            # Create event with record data
             event = {
                 "event_time": str(record["event_time"]),
                 "event_type": record["event_type"],
@@ -172,13 +169,13 @@ def load_carts_to_redis(df: pd.DataFrame) -> bool:
                 "lost_revenue": safe_float_conversion(record["lost_revenue"]),
             }
 
-            # Agregar evento y acumular métricas
+            # Add event and accumulate metrics
             carts[cart_id]["events"].append(event)
             carts[cart_id]["total_revenue"] += safe_float_conversion(record["revenue"])
             carts[cart_id]["lost_revenue"] += safe_float_conversion(record["lost_revenue"])
 
-        # Persistir carritos en Redis como hash keys
-        # Formato: cart:{cart_id} -> {customer_id, events, total_revenue, lost_revenue}
+        # Persist carts in Redis as hash keys
+        # Format: cart:{cart_id} -> {customer_id, events, total_revenue, lost_revenue}
         for cart_id, cart_data in carts.items():
             redis_client.hset(
                 f"cart:{cart_id}",
@@ -191,82 +188,83 @@ def load_carts_to_redis(df: pd.DataFrame) -> bool:
                 },
             )
 
-        print(f"[LOAD] {len(carts)} carritos cargados a Redis")
+        # print(f"[LOAD] {len(carts)} carts loaded to Redis")
 
-        # Guardar copia en CSV para auditoría
+        # Save copy to CSV for audit
         save_dataframe_to_csv(df, Path(PROCESSED_CSV).parent, "carts_processed.csv")
 
         return True
 
     except Exception as e:
-        print(f"[LOAD] Error cargando a Redis: {e}")
+        print(f"[LOAD] Error loading to Redis: {e}")
         return False
 
     finally:
-        # Asegurar cierre de conexión incluso si hay error
+        # Ensure connection close even if error
         if redis_client is not None:
             redis_client.close()
 
 
 # ========================================================================
-# FUNCIÓN PRINCIPAL DE ORQUESTACIÓN
+# MAIN ORCHESTRATION FUNCTION
 # ========================================================================
 
 
 def load_all(amazon_df: pd.DataFrame, cart_df: pd.DataFrame) -> bool:
     """
-    Ejecuta la etapa LOAD completa del pipeline ETL.
+    Executes the full LOAD stage of the ETL pipeline.
 
-    Carga datos transformados a:
-    - MongoDB: Catálogo de productos
-    - Redis: Eventos de carritos
-    - CSV: Copias de auditoría
+    Loads transformed data to:
+    - MongoDB: Product catalog
+    - Redis: Cart events
+    - CSV: Audit copies
 
     Args:
-        amazon_df: DataFrame con productos transformados
-        cart_df: DataFrame con eventos de carrito transformados
+        amazon_df: DataFrame with transformed products
+        cart_df: DataFrame with transformed cart events
 
     Returns:
-        True si ambas cargas fueron exitosas, False en caso contrario
+        True if both loads were successful, False otherwise
     """
-    print("\n[LOAD] Iniciando carga de datos...\n")
+    # print("\n[LOAD] Starting data load...\n")
 
-    # Validar datos de entrada
+    # Validate input data
     if amazon_df is None or amazon_df.empty:
-        print("[LOAD] Error: se requiere el dataframe de productos de Amazon.")
+        print("[LOAD] Error: Amazon products dataframe is required.")
         return False
 
     if cart_df is None or cart_df.empty:
-        print("[LOAD] Error: se requiere el dataframe de eventos de carrito.")
+        print("[LOAD] Error: Cart events dataframe is required.")
         return False
 
-    # Ejecutar cargas en paralelo lógico (independientes entre sí)
+    # Execute loads logically parallel (independent of each other)
     mongo_ok = load_products_to_mongodb(amazon_df)
     redis_ok = load_carts_to_redis(cart_df)
 
-    # Validar que ambas cargas fueron exitosas
-    if mongo_ok and redis_ok:
-        print("\n[LOAD] Todas las cargas completadas exitosamente")
-    else:
-        print("\n[LOAD] Advertencia: Algunas cargas fallaron")
+    # Validate that both loads were successful
+    if not (mongo_ok and redis_ok):
+        print("\n[LOAD] Warning: Some loads failed")
         if not mongo_ok:
-            print("  - MongoDB: FALLIDO")
+            print("  - MongoDB: FAILED")
         if not redis_ok:
-            print("  - Redis: FALLIDO")
-
+            print("  - Redis: FAILED")
+    
     return mongo_ok and redis_ok
 
 
 def main():
-    """Ejecuta el módulo LOAD de manera independiente."""
-    print("[LOAD] Obteniendo datos transformados...")
+    """Executes the LOAD module independently."""
+    print("[LOAD] Getting transformed data...")
     transform_result = transform_all()
-    if transform_result is None:
-        print("[LOAD] Error: no se pudieron obtener los datos transformados.")
+    if transform_result is None or transform_result[0] is None:
+        print("[LOAD] Error: Could not get transformed data.")
         sys.exit(1)
 
     products_df, carts_df = transform_result
-    load_all(products_df, carts_df)
+    if load_all(products_df, carts_df):
+        print("[LOAD] Success")
+    else:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

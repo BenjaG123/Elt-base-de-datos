@@ -1,14 +1,14 @@
 """
-Paquete QUERIES: Consultas independientes a datos crudos.
+QUERIES Package: Independent queries to raw data.
 
-Este paquete permite consultar directamente los datos almacenados
-en MongoDB y Redis sin necesidad de ejecutar el pipeline ETL completo.
+This package allows querying data stored in MongoDB and Redis directly,
+without executing the full ETL pipeline.
 
-Casos de uso:
-- Consultas ad-hoc para análisis exploratorio
-- Debugging y verificación de datos
-- Reportes independientes
-- Testing de datos crudos
+Use cases:
+- Ad-hoc queries for exploratory analysis
+- Debugging and data verification
+- Independent reports
+- Raw data testing
 """
 
 from src.queries.mongo_queries import (

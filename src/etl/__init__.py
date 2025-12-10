@@ -1,7 +1,7 @@
 """
-Paquete ETL: Extract, Transform, Load.
+ETL Package: Extract, Transform, Load.
 
-Este paquete contiene los módulos principales del pipeline ETL.
+This package contains the main modules of the ETL pipeline.
 """
 
 from src.etl.extract import extract_all, load_amazon_data, load_redis_cart_simulation

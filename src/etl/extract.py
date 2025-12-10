@@ -1,6 +1,6 @@
 """
-Etapa EXTRACT: Lee datasets crudos de Amazon y simulación de carritos Redis.
-Para ETL con MongoDB (catálogo) y Redis (carritos en tiempo real).
+EXTRACT Stage: Reads raw datasets from Amazon and Redis cart simulation.
+For ETL with MongoDB (catalog) and Redis (real-time carts).
 """
 
 from pathlib import Path
@@ -11,100 +11,69 @@ from src.config import AMAZON_CSV, REDIS_CART_CSV
 
 
 def _load_csv(path_str: str) -> Optional[pd.DataFrame]:
-    """Lee un CSV y devuelve un DataFrame con validaciones básicas."""
+    """Reads a CSV and returns a DataFrame with basic validations."""
     path = Path(path_str)
     if not path.is_file():
-        print(f"[EXTRACT] No se encontró el archivo: {path}")
+        print(f"[EXTRACT] Error: File not found: {path}")
         return None
 
     df = pd.read_csv(path)
-    print(f"[EXTRACT] Leído {len(df)} filas de {path}")
 
-    # Validación 1: Existencia y estructura del archivo
-    print(f"[EXTRACT] Estructura: {len(df.columns)} columnas, {len(df)} registros")
-    print(f"[EXTRACT] Columnas: {list(df.columns)}")
-
-    # Validación 2: Archivo no vacío
+    # Validation 1: Empty file
     if len(df) == 0:
-        print("[ERROR] El archivo está vacío")
+        print("[EXTRACT] Error: File is empty")
         return None
-    print(f"[EXTRACT] [OK] Archivo no vacío")
 
-    # Validación 3: Valores nulos detectados
+    # Validation 2: Null values detected
     null_count = df.isnull().sum().sum()
     if null_count > 0:
-        print(f"[EXTRACT] Valores nulos detectados: {null_count} total")
-        for col in df.columns:
-            nulls = df[col].isnull().sum()
-            if nulls > 0:
-                print(f"  - {col}: {nulls} nulos ({nulls/len(df)*100:.1f}%)")
-    else:
-        print(f"[EXTRACT] [OK] Sin valores nulos")
+        print(f"[EXTRACT] Warning: {null_count} null values detected in {path.name}")
 
-    # Validación 4: Duplicados detectados
+    # Validation 3: Duplicates detected
     duplicate_count = df.duplicated().sum()
     if duplicate_count > 0:
-        print(f"[EXTRACT] Duplicados detectados: {duplicate_count} registros")
-    else:
-        print(f"[EXTRACT] [OK] Sin duplicados")
+        print(f"[EXTRACT] Warning: {duplicate_count} duplicate records in {path.name}")
 
-    # Validación 5: Detección de valores atípicos en columnas numéricas
-    numeric_cols = df.select_dtypes(include=['number']).columns
-    if len(numeric_cols) > 0:
-        print(f"[EXTRACT] Columnas numéricas detectadas: {list(numeric_cols)}")
-        for col in numeric_cols:
-            min_val = df[col].min()
-            max_val = df[col].max()
-            print(f"  - {col}: min={min_val}, max={max_val}")
-
-    # Validación 6: Detección de formatos de fecha/hora
+    # Validation 4: Date/time formats
     date_cols = [col for col in df.columns if 'time' in col.lower() or 'date' in col.lower()]
     if date_cols:
-        print(f"[EXTRACT] Columnas de fecha/hora detectadas: {date_cols}")
         for col in date_cols:
             try:
                 valid_dates = pd.to_datetime(df[col], errors='coerce')
                 invalid_count = valid_dates.isnull().sum() - df[col].isnull().sum()
                 if invalid_count > 0:
-                    print(f"  - {col}: {invalid_count} fechas con formato incorrecto")
-                else:
-                    print(f"  - {col}: [OK] Todas las fechas válidas")
+                    print(f"[EXTRACT] Warning: {col} has {invalid_count} invalid dates")
             except Exception as e:
-                print(f"  - {col}: Error en validación - {e}")
+                print(f"[EXTRACT] Error validating dates in {col}: {e}")
 
     return df
 
 
 def load_amazon_data() -> Optional[pd.DataFrame]:
-    """Carga el dataset de productos Amazon para MongoDB."""
+    """Loads Amazon product dataset for MongoDB."""
     return _load_csv(AMAZON_CSV)
 
 
 def load_redis_cart_simulation() -> Optional[pd.DataFrame]:
-    """Carga la simulación de carritos para Redis."""
+    """Loads cart simulation for Redis."""
     return _load_csv(REDIS_CART_CSV)
 
 
 def extract_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
-    """Ejecuta la etapa EXTRACT leyendo ambos datasets."""
-    print("\n[EXTRACT] Iniciando extracción de datos...\n")
+    """Executes EXTRACT stage reading both datasets."""
+    # print("\n[EXTRACT] Starting data extraction...\n")
 
     amazon_df = load_amazon_data()
     redis_cart_df = load_redis_cart_simulation()
 
-    if amazon_df is not None:
-        print(f"\n[EXTRACT] Productos Amazon: {len(amazon_df)} registros")
-        print(amazon_df[['product_name', 'discounted_price', 'category']].head(5))
-
-    if redis_cart_df is not None:
-        print(f"\n[EXTRACT] Eventos de carrito: {len(redis_cart_df)} eventos")
-        print(redis_cart_df[['cart_id', 'event_type', 'product_id', 'quantity']].head(5))
-
+    if amazon_df is None or redis_cart_df is None:
+        print("[EXTRACT] Error: One or more datasets failed to load")
+    
     return amazon_df, redis_cart_df
 
 
 def main():
-    """Ejecuta el módulo EXTRACT de manera independiente."""
+    """Executes EXTRACT module independently."""
     extract_all()
 
 

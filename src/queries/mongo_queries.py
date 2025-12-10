@@ -1,9 +1,8 @@
 """
-Consultas independientes a MongoDB (datos crudos de productos).
+Independent MongoDB queries (raw product data).
 
-Este módulo proporciona funciones para consultar directamente
-la colección de productos en MongoDB sin pasar por el pipeline ETL.
+This module provides functions to query the MongoDB product collection
+directly without passing through the ETL pipeline.
 
-Todas las consultas retornan datos tal como están almacenados,
-sin transformaciones adicionales.
+All queries return data as stored, without additional transformations.
 """

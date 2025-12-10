@@ -1,10 +1,9 @@
 """
-Consultas independientes a Redis (datos crudos de carritos).
+Independent Redis queries (raw cart data).
 
-Este módulo proporciona funciones para consultar directamente
-los carritos almacenados en Redis sin pasar por el pipeline ETL.
+This module provides functions to query carts stored in Redis
+directly without passing through the ETL pipeline.
 
-Todas las consultas retornan datos tal como están almacenados,
-sin transformaciones adicionales.
+All queries return data as stored, without additional transformations.
 """
 

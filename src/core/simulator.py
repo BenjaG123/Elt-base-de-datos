@@ -1,7 +1,7 @@
 """
-SIMULADOR DE CYBERDAY
-Simula compras en tiempo real, calcula dinero perdido, 
-productos más vendidos, categorías, etc.
+CYBERDAY SIMULATOR
+Simulates real-time shopping, calculates lost revenue,
+best-selling products, categories, etc.
 """
 
 import random
@@ -14,15 +14,15 @@ import time
 
 
 class CyberdaySimulator:
-    """Simulador de Cyber Day con productos Amazon."""
+    """Cyber Day Simulator with Amazon products."""
     
     def __init__(self, num_customers: int = 50, num_events: int = 200):
         """
-        Inicializa el simulador.
+        Initializes the simulator.
         
         Args:
-            num_customers: Número de clientes simulados
-            num_events: Número total de eventos a generar
+            num_customers: Number of simulated customers
+            num_events: Total events to generate
         """
         self.num_customers = num_customers
         self.num_events = num_events
@@ -30,84 +30,79 @@ class CyberdaySimulator:
         self.simulation_start = datetime.now()
         
     def load_products_from_mongo(self) -> bool:
-        """Carga productos desde MongoDB."""
+        """Loads products from MongoDB."""
         try:
             _, _, collection = get_mongo_connection()
             if collection is None:
-                print("[SIMULATOR] No se pudo conectar a MongoDB")
+                print("[SIMULATOR] Error: Could not connect to MongoDB")
                 return False
             
-            # Cargar todos los productos
+            # Load all products
             self.products = list(collection.find({}))
-            print(f"[SIMULATOR] Cargados {len(self.products)} productos de MongoDB")
             
             if not self.products:
-                print("[SIMULATOR] No hay productos en MongoDB")
+                print("[SIMULATOR] Error: No products in MongoDB")
                 return False
                 
             return True
             
         except Exception as e:
-            print(f"[SIMULATOR] Error cargando productos: {e}")
+            print(f"[SIMULATOR] Error loading products: {e}")
             return False
     
     def simulate_cyberday(self, save_to_redis: bool = True) -> pd.DataFrame:
         """
-        Simula un Cyber Day completo.
+        Simulates a complete Cyber Day.
         
         Returns:
-            DataFrame con todos los eventos simulados
+            DataFrame with all simulated events
         """
-        print("\n" + "="*70)
-        print("🚀 INICIANDO SIMULACIÓN DE CYBER DAY")
-        print("="*70 + "\n")
-        
         if not self.load_products_from_mongo():
             return None
         
         events = []
         cart_id = 1
         
-        # Diccionario para tracking de stock en tiempo real
+        # Dictionary for real-time stock tracking
         stock_tracker = {}
-        stock_out_times = {}  # Guarda el tiempo de agotamiento
+        stock_out_times = {}  # Tracks stock-out times
         
         for product in self.products:
             stock_tracker[product['product_id']] = product['stock']
         
-        # Generar eventos
+        # Generate events
         current_time = self.simulation_start
         
         for i in range(self.num_events):
-            # Seleccionar cliente
+            # Select customer
             customer_id = f"CUST-{random.randint(1, self.num_customers):03d}"
             
-            # Seleccionar producto aleatorio
+            # Select random product
             product = random.choice(self.products)
             product_id = product['product_id']
             product_name = product['product_name']
             price = product['discounted_price']
             category = product['category']
             
-            # Cantidad a comprar (1-5 unidades)
+            # Quantity (1-5 units)
             quantity = random.randint(1, 5)
             
-            # Incrementar tiempo
+            # Increment time
             current_time += timedelta(seconds=random.randint(1, 10))
             
-            # Verificar stock disponible
+            # Check available stock
             available_stock = stock_tracker.get(product_id, 0)
             
-            # Decidir tipo de evento
+            # Decide event type
             if available_stock <= 0:
-                # STOCK AGOTADO - registrar venta perdida
+                # OUT OF STOCK - record lost sale
                 event_type = "stock_out"
                 stock_before = 0
                 stock_after = 0
                 revenue = 0
                 lost_revenue = price * quantity
                 
-                # Registrar tiempo de agotamiento si es primera vez
+                # Record stock out time if first time
                 if product_id not in stock_out_times:
                     stock_out_times[product_id] = {
                         'time': current_time,
@@ -115,10 +110,9 @@ class CyberdaySimulator:
                         'product_name': product_name,
                         'category': category
                     }
-                    print(f"  ⚠️  AGOTADO: {product_name[:40]}... en {stock_out_times[product_id]['duration_seconds']:.0f}s")
                 
             elif available_stock < quantity:
-                # Stock insuficiente - compra parcial
+                # Insufficient stock - partial checkout
                 quantity_sold = available_stock
                 quantity_lost = quantity - available_stock
                 
@@ -130,7 +124,7 @@ class CyberdaySimulator:
                 
                 stock_tracker[product_id] = 0
                 
-                # Registrar agotamiento
+                # Record stock out
                 if product_id not in stock_out_times:
                     stock_out_times[product_id] = {
                         'time': current_time,
@@ -138,10 +132,9 @@ class CyberdaySimulator:
                         'product_name': product_name,
                         'category': category
                     }
-                    print(f"  ⚠️  AGOTADO: {product_name[:40]}... en {stock_out_times[product_id]['duration_seconds']:.0f}s")
                 
             else:
-                # Stock disponible - decisión aleatoria
+                # Stock available - random decision
                 action = random.choices(
                     ['checkout', 'add', 'abandon'],
                     weights=[0.6, 0.3, 0.1],  # 60% checkout, 30% add, 10% abandon
@@ -159,7 +152,7 @@ class CyberdaySimulator:
                     
                 elif action == 'add':
                     event_type = "add"
-                    stock_after = available_stock  # No se descuenta aún
+                    stock_after = available_stock  # Not deducted yet
                     revenue = 0
                     lost_revenue = 0
                     
@@ -169,7 +162,7 @@ class CyberdaySimulator:
                     revenue = 0
                     lost_revenue = 0
             
-            # Crear evento
+            # Create event
             event = {
                 'cart_id': f"CART-{cart_id:03d}",
                 'customer_id': customer_id,
@@ -188,27 +181,22 @@ class CyberdaySimulator:
             
             events.append(event)
             
-            # Incrementar cart_id aleatoriamente
-            if random.random() > 0.7:  # 30% chance de nuevo carrito
+            # Increment cart_id randomly
+            if random.random() > 0.7:  # 30% chance of new cart
                 cart_id += 1
         
-        # Crear DataFrame
+        # Create DataFrame
         df = pd.DataFrame(events)
         
-        # Guardar tiempos de agotamiento en Redis si se solicita
+        # Save to Redis if requested
         if save_to_redis:
-            self._save_events_to_redis(df)  #  ← PRIMERO los carritos (con flush)
-            self._save_stock_out_times_to_redis(stock_out_times)  # ← DESPUÉS los stock_out
-        
-        print(f"\n✅ Simulación completada: {len(events)} eventos generados")
-        print(f"   Carritos únicos: {df['cart_id'].nunique()}")
-        print(f"   Clientes únicos: {df['customer_id'].nunique()}")
-        print(f"   Productos agotados: {len(stock_out_times)}")
+            self._save_events_to_redis(df)
+            self._save_stock_out_times_to_redis(stock_out_times)
         
         return df
     
     def _save_stock_out_times_to_redis(self, stock_out_times: Dict):
-        """Guarda tiempos de agotamiento en Redis."""
+        """Saves stock-out times to Redis."""
         try:
             redis_client = get_redis_connection()
             if redis_client is None:
@@ -223,23 +211,22 @@ class CyberdaySimulator:
                     'duration_seconds': data['duration_seconds']
                 })
             
-            print(f"[SIMULATOR] {len(stock_out_times)} tiempos de agotamiento guardados en Redis")
             redis_client.close()
             
         except Exception as e:
-            print(f"[SIMULATOR] Error guardando tiempos de agotamiento: {e}")
+            print(f"[SIMULATOR] Error saving stock-out times: {e}")
     
     def _save_events_to_redis(self, df: pd.DataFrame):
-        """Guarda eventos agrupados por carrito en Redis."""
+        """Saves events grouped by cart to Redis."""
         try:
             redis_client = get_redis_connection()
             if redis_client is None:
                 return
             
-            # Limpiar Redis
+            # Clear Redis
             redis_client.flushdb()
             
-            # Agrupar por carrito
+            # Group by cart
             for cart_id in df['cart_id'].unique():
                 cart_events = df[df['cart_id'] == cart_id]
                 
@@ -265,7 +252,7 @@ class CyberdaySimulator:
                     total_revenue += row['revenue']
                     total_lost += row['lost_revenue']
                 
-                # Guardar en Redis
+                # Save to Redis
                 redis_client.hset(
                     f"cart:{cart_id}",
                     mapping={
@@ -277,24 +264,23 @@ class CyberdaySimulator:
                     }
                 )
             
-            print(f"[SIMULATOR] {df['cart_id'].nunique()} carritos guardados en Redis")
             redis_client.close()
             
         except Exception as e:
-            print(f"[SIMULATOR] Error guardando eventos: {e}")
+            print(f"[SIMULATOR] Error saving events: {e}")
 
 
 def run_simulation(num_customers: int = 50, num_events: int = 200, save_csv: bool = True) -> pd.DataFrame:
     """
-    Ejecuta la simulación completa.
+    Runs the full simulation.
     
     Args:
-        num_customers: Número de clientes
-        num_events: Número de eventos
-        save_csv: Si guardar el resultado en CSV
+        num_customers: Number of customers
+        num_events: Number of events
+        save_csv: Whether to save result to CSV
         
     Returns:
-        DataFrame con todos los eventos
+        DataFrame with all events
     """
     simulator = CyberdaySimulator(num_customers, num_events)
     df = simulator.simulate_cyberday(save_to_redis=True)
@@ -302,20 +288,19 @@ def run_simulation(num_customers: int = 50, num_events: int = 200, save_csv: boo
     if df is not None and save_csv:
         output_path = "data/processed/cyberday_simulation.csv"
         df.to_csv(output_path, index=False)
-        print(f"\n📁 Simulación guardada en: {output_path}")
     
     return df
 
 
 if __name__ == "__main__":
-    # Ejecutar simulación con valores por defecto
+    # Run simulation with default values
     df = run_simulation(num_customers=100, num_events=500)
     
     if df is not None:
         print("\n" + "="*70)
-        print("📊 RESUMEN DE LA SIMULACIÓN")
+        print("SIMULATION SUMMARY")
         print("="*70)
-        print(f"\nTotal eventos: {len(df)}")
-        print(f"Ingresos totales: ${df['revenue'].sum():,.2f}")
-        print(f"Ingresos perdidos: ${df['lost_revenue'].sum():,.2f}")
-        print(f"Tasa de éxito: {(df['revenue'].sum() / (df['revenue'].sum() + df['lost_revenue'].sum()) * 100):.1f}%")
+        print(f"\nTotal events: {len(df)}")
+        print(f"Total revenue: ${df['revenue'].sum():,.2f}")
+        print(f"Lost revenue: ${df['lost_revenue'].sum():,.2f}")
+        print(f"Success rate: {(df['revenue'].sum() / (df['revenue'].sum() + df['lost_revenue'].sum()) * 100):.1f}%")

@@ -1,16 +1,16 @@
 """
-Módulo TRANSFORM: Limpieza y transformación de datos del pipeline ETL.
+TRANSFORM Module: Data cleaning and transformation of the ETL pipeline.
 
-Este módulo implementa la fase T (Transform) del proceso ETL, realizando:
-- Validación de integridad de datos
-- Normalización de formatos (precios, porcentajes, fechas)
-- Limpieza de valores faltantes y outliers
-- Aplicación de reglas de negocio
-- Generación de estadísticas de calidad de datos
+This module implements the T (Transform) phase of the ETL process, performing:
+- Data integrity validation
+- Format normalization (prices, percentages, dates)
+- Missing value and outlier cleaning
+- Business rule application
+- Data quality statistics generation
 
-Fuentes de datos:
-- Amazon Products: Catálogo de productos con precios y categorías
-- Redis Cart Events: Eventos de carritos de compra en tiempo real
+Data sources:
+- Amazon Products: Product catalog with prices and categories
+- Redis Cart Events: Real-time shopping cart events
 """
 
 from datetime import datetime, timezone
@@ -26,64 +26,64 @@ from src.utils import (
 )
 
 # ========================================================================
-# CONSTANTES DE VALIDACIÓN DE NEGOCIO
+# BUSINESS VALIDATION CONSTANTS
 # ========================================================================
 
-# Cantidades por transacción (límites de negocio)
+# Quantities per transaction (business limits)
 MIN_QUANTITY = 1
 MAX_QUANTITY = 100
 
 
 # ========================================================================
-# FUNCIONES DE TRANSFORMACIÓN PRINCIPALES
+# MAIN TRANSFORMATION FUNCTIONS
 # ========================================================================
 
 
 def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
     """
-    Transforma y limpia datos de productos Amazon.
+    Transforms and cleans Amazon product data.
 
-    Operaciones realizadas:
-    - Elimina columnas innecesarias (reviews, ratings, imágenes)
-    - Filtra productos sin nombre o ID
-    - Normaliza precios y porcentajes de descuento
+    Operations performed:
+    - Removes unnecessary columns (reviews, ratings, images)
+    - Filters products without name or ID
+    - Normalizes prices and discount percentages
 
     Args:
-        df: DataFrame con datos crudos de productos Amazon
+        df: DataFrame with raw Amazon product data
 
     Returns:
-        DataFrame transformado o None si el input es inválido
+        Transformed DataFrame or None if input is invalid
     """
     if df is None or df.empty:
         return None
 
     df = df.copy()
     
-    # Validación de integridad: eliminar registros sin identificadores críticos
-    # Paso 1: Remover filas con valores NaN/None en campos obligatorios
+    # Integrity validation: remove records without critical identifiers
+    # Step 1: Remove rows with NaN/None in mandatory fields
     df = df.dropna(subset=["product_name", "product_id"])
 
-    # Paso 2: Filtrar strings vacíos o solo espacios en blanco
+    # Step 2: Filter empty strings or whitespace only
     df = df[df["product_name"].astype(str).str.strip() != ""]
     df = df[df["product_id"].astype(str).str.strip() != ""]
 
-    # Limpieza de esquema: eliminar columnas no utilizadas en el pipeline ETL
-    # Estas columnas agregan ruido sin valor para análisis de ventas/carritos
-    campos_innecesarios = [
+    # Schema cleanup: remove columns not used in ETL pipeline
+    # These columns add noise without value for sales/cart analysis
+    unnecessary_fields = [
         'user_id', 'user_name', 'review_id', 'review_title',
         'review_content', 'img_link', 'product_link', 'rating', 'rating_count'
     ]
     df = df.drop(
-        columns=[col for col in campos_innecesarios if col in df.columns],
+        columns=[col for col in unnecessary_fields if col in df.columns],
         errors='ignore'
     )
-    print("[TRANSFORM] Campos de metadata eliminados (reviews, ratings, links, usuarios)")
+    # print("[TRANSFORM] Metadata fields removed (reviews, ratings, links, users)")
 
-    # Normalización de valores faltantes con valores por defecto semánticamente correctos
+    # Normalize missing values with semantically correct defaults
     df["about_product"] = df["about_product"].fillna("")
 
-    # Limpieza y conversión de columnas monetarias
-    # Remueve símbolos de moneda (₹), separadores de miles (,) y convierte a float
+    # Clean and convert monetary columns
+    # Removes currency symbols (₹), thousands separators (,) and converts to float
     df["actual_price"] = safe_numeric_conversion(
         clean_price_column(df["actual_price"]), default=0
     )
@@ -94,54 +94,54 @@ def transform_amazon_products(df: Optional[pd.DataFrame]) -> Optional[pd.DataFra
         clean_percentage_column(df["discount_percentage"]), default=0
     )
 
-    print(f"[TRANSFORM] {len(df)} productos Amazon transformados")
+    # print(f"[TRANSFORM] {len(df)} Amazon products transformed")
     return df
 
 
 def transform_redis_carts(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
     """
-    Transforma y limpia datos de eventos de carrito.
+    Transforms and cleans cart event data.
 
-    Operaciones realizadas:
-    - Convierte timestamps a formato datetime
-    - Valida cantidades dentro de rangos permitidos
-    - Normaliza valores de stock y revenue
-    - Convierte tipos de datos apropiados
+    Operations performed:
+    - Converts timestamps to datetime format
+    - Validates quantities within permitted ranges
+    - Normalizes stock and revenue values
+    - Converts appropriate data types
 
     Args:
-        df: DataFrame con eventos crudos de carrito
+        df: DataFrame with raw cart events
 
     Returns:
-        DataFrame transformado o None si el input es inválido
+        Transformed DataFrame or None if input is invalid
     """
     if df is None or df.empty:
         return None
 
     df = df.copy()
 
-    # Conversión temporal: parsear timestamps a objetos datetime de pandas
-    # Permite operaciones temporales y análisis de series de tiempo
+    # Temporal conversion: parse timestamps to pandas datetime objects
+    # Allows temporal operations and time series analysis
     df["event_time"] = pd.to_datetime(df["event_time"], errors="coerce")
 
-    # Validación de cantidades: asegurar valores dentro de límites de negocio
-    # Rango permitido: 1-100 unidades por transacción
+    # Quantity validation: ensure values within business limits
+    # Permitted range: 1-100 units per transaction
     df["quantity"] = safe_numeric_conversion(df["quantity"], default=MIN_QUANTITY).astype(int)
     df["quantity"] = df["quantity"].clip(lower=MIN_QUANTITY, upper=MAX_QUANTITY)
 
-    # Conversión de métricas de inventario y financieras
-    # Stock: valores enteros no negativos
-    # Revenue: valores flotantes para precisión monetaria
+    # Inventory and financial metrics conversion
+    # Stock: non-negative integer values
+    # Revenue: float values for monetary precision
     df["stock_before"] = safe_numeric_conversion(df["stock_before"], default=0).astype(int)
     df["stock_after"] = safe_numeric_conversion(df["stock_after"], default=0).astype(int)
     df["revenue"] = safe_numeric_conversion(df["revenue"], default=0).astype(float)
     df["lost_revenue"] = safe_numeric_conversion(df["lost_revenue"], default=0).astype(float)
 
-    print(f"[TRANSFORM] {len(df)} eventos de carrito transformados")
+    # print(f"[TRANSFORM] {len(df)} cart events transformed")
     return df
 
 
 # ========================================================================
-# FUNCIONES DE MÉTRICAS Y ESTADÍSTICAS
+# METRICS AND STATISTICS FUNCTIONS
 # ========================================================================
 
 
@@ -149,14 +149,14 @@ def get_transformation_stats(
     amazon_df: Optional[pd.DataFrame], cart_df: Optional[pd.DataFrame]
 ) -> Dict[str, dict]:
     """
-    Obtiene estadísticas de transformación.
+    Gets transformation statistics.
 
     Args:
-        amazon_df: DataFrame de productos Amazon transformados
-        cart_df: DataFrame de eventos de carrito transformados
+        amazon_df: Transformed Amazon product DataFrame
+        cart_df: Transformed cart event DataFrame
 
     Returns:
-        Diccionario con estadísticas de productos y carritos
+        Dictionary with product and cart statistics
     """
     stats = {
         "products": {
@@ -177,44 +177,48 @@ def get_transformation_stats(
 
 
 # ========================================================================
-# FUNCIÓN PRINCIPAL DE ORQUESTACIÓN
+# MAIN ORCHESTRATION FUNCTION
 # ========================================================================
 
 
 def transform_all() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     """
-    Ejecuta la etapa TRANSFORM completa.
+    Executes the complete TRANSFORM stage.
 
     Returns:
-        Tupla con (productos Amazon transformados, eventos de carrito transformados)
+        Tuple with (transformed Amazon products, transformed cart events)
     """
-    print("\n[TRANSFORM] Iniciando transformacion...\n")
+    # print("\n[TRANSFORM] Starting transformation...\n")
 
-    # Paso 1: Extraer datos crudos de fuentes CSV
+    # Step 1: Extract raw data from CSV sources
     amazon_df, redis_cart_df = extract_all()
 
-    # Paso 2: Aplicar transformaciones específicas por tipo de dato
+    # Step 2: Apply specific transformations by data type
     amazon_transformed = transform_amazon_products(amazon_df)
     cart_transformed = transform_redis_carts(redis_cart_df)
 
-    # Paso 3: Calcular métricas de calidad de datos post-transformación
+    # Step 3: Calculate post-transformation data quality metrics
     stats = get_transformation_stats(amazon_transformed, cart_transformed)
 
-    # Paso 4: Mostrar resumen ejecutivo de la transformación
-    print("\n[TRANSFORM] Estadisticas:")
-    print(f"  Productos: {stats['products']['total']}")
-    print(f"  Categorias: {stats['products']['categories']}")
-    print(f"  Descuento Promedio: {stats['products']['avg_discount']:.2f}%")
-    print(f"  Carritos: {stats['carts']['unique_carts']}")
-    print(f"  Ingresos: ${stats['carts']['total_revenue']:.2f}")
-    print(f"  Ingresos Perdidos: ${stats['carts']['lost_revenue']:.2f}")
+    # Step 4: Show executive summary of transformation (only if running main or verbose)
+    # Keeping it minimal as per "silent by default", but useful for debugging
+    # print(f"[TRANSFORM] Status: Products={stats['products']['total']}, Carts={stats['carts']['unique_carts']}")
 
     return amazon_transformed, cart_transformed
 
 
 def main():
-    """Ejecuta el módulo TRANSFORM de manera independiente."""
-    transform_all()
+    """Executes the TRANSFORM module independently."""
+    amazon, carts = transform_all()
+    if amazon is not None and carts is not None:
+         stats = get_transformation_stats(amazon, carts)
+         print("\n[TRANSFORM] Statistics:")
+         print(f"  Products: {stats['products']['total']}")
+         print(f"  Categories: {stats['products']['categories']}")
+         print(f"  Avg Discount: {stats['products']['avg_discount']:.2f}%")
+         print(f"  Carts: {stats['carts']['unique_carts']}")
+         print(f"  Revenue: ${stats['carts']['total_revenue']:.2f}")
+         print(f"  Lost Revenue: ${stats['carts']['lost_revenue']:.2f}")
 
 
 if __name__ == "__main__":

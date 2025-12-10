@@ -1,8 +1,7 @@
 """
-Paquete UTILS: Utilidades compartidas.
+UTILS Package: Shared utilities.
 
-Este paquete contiene funciones auxiliares reutilizables
-en todo el proyecto.
+This package contains reusable helper functions for the entire project.
 """
 
 from src.utils.helpers import (

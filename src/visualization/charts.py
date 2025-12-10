@@ -1,365 +1,5 @@
 """
-Visualizaciones para análisis del Cyberday: MongoDB + Redis
-"""
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import json
-from pathlib import Path
-from src.config import get_mongo_connection, get_redis_connection
-from pathlib import Path
-
-# Crear directorio de salida si no existe
-Path("data/processed").mkdir(parents=True, exist_ok=True)
-
-
-def plot_product_categories_distribution():
-    """Gráfico de distribución de productos por categoría."""
-    try:
-        _, _, collection = get_mongo_connection()
-        if collection is None:
-            return
-
-        # Agregación por categoría (Amazon no tiene campo brand)
-        pipeline = [
-            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-            {"$limit": 15},
-        ]
-
-        results = list(collection.aggregate(pipeline))
-
-        if not results:
-            print("[VIZ] No hay datos de productos")
-            return
-
-        categories = [r["_id"] for r in results]
-        counts = [r["count"] for r in results]
-
-        # Crear directorio si no existe
-        Path("docs/images").mkdir(parents=True, exist_ok=True)
-
-        plt.figure(figsize=(12, 6))
-        plt.barh(categories, counts, color="steelblue")
-        plt.xlabel("Cantidad de Productos")
-        plt.title("Top 15 Categorías por Cantidad de Productos - Amazon")
-        plt.tight_layout()
-        plt.savefig("docs/images/categories_distribution.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] Gráfico guardado: docs/images/categories_distribution.png")
-        plt.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en gráfico de categorías: {e}")
-
-
-def plot_price_distribution():
-    """Gráfico de distribución de precios."""
-    try:
-        _, _, collection = get_mongo_connection()
-        if collection is None:
-            return
-
-        # Obtener precios
-        prices = [doc["discounted_price"] for doc in collection.find({}, {"discounted_price": 1}) if doc.get("discounted_price", 0) > 0]
-
-        if not prices:
-            print("[VIZ] No hay datos de precios")
-            return
-
-        # Crear directorio si no existe
-        Path("docs/images").mkdir(parents=True, exist_ok=True)
-
-        plt.figure(figsize=(12, 6))
-        plt.hist(prices, bins=50, color="coral", edgecolor="black", alpha=0.7)
-        plt.xlabel("Precio Descuentado (Rupias)")
-        plt.ylabel("Cantidad de Productos")
-        plt.title("Distribución de Precios - Amazon")
-        plt.tight_layout()
-        plt.savefig("docs/images/price_distribution.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] Gráfico guardado: docs/images/price_distribution.png")
-        plt.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en distribución de precios: {e}")
-
-
-def plot_cart_events_timeline():
-    """Gráfico de eventos de carrito en tiempo."""
-    try:
-        redis_client = get_redis_connection()
-        _, _, collection = get_mongo_connection()
-        
-        if redis_client is None or collection is None:
-            return
-
-        # Obtener ventas por producto
-        sales = {}
-        cart_keys = redis_client.keys("cart:CART-*")
-        
-        for key in cart_keys:
-            cart_data = redis_client.hgetall(key)
-            try:
-                events = json.loads(cart_data.get("events", "[]"))
-                for event in events:
-                    event_type = event.get("event_type", "unknown")
-                    if event_type in events_by_type:
-                        events_by_type[event_type] += 1
-            except:
-                pass
-
-        if sum(events_by_type.values()) == 0:
-            print("[VIZ] No hay eventos de carrito")
-            return
-
-        # Crear directorio si no existe
-        Path("docs/images").mkdir(parents=True, exist_ok=True)
-
-        plt.figure(figsize=(10, 6))
-        colors = ["#2ecc71", "#3498db", "#e74c3c", "#f39c12"]
-        plt.bar(events_by_type.keys(), events_by_type.values(), color=colors)
-        plt.xlabel("Tipo de Evento")
-        plt.ylabel("Cantidad de Eventos")
-        plt.title("Eventos de Carrito - Cyberday Amazon")
-        plt.tight_layout()
-        plt.savefig("docs/images/cart_events.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] Gráfico guardado: docs/images/cart_events.png")
-        plt.close()
-
-        redis_client.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en productos más vendidos: {e}")
-
-
-def plot_top_categories():
-    """Gráfico de categorías más vendidas."""
-    try:
-        redis_client = get_redis_connection()
-        
-        if redis_client is None:
-            return
-
-        # Obtener ventas por categoría
-        category_sales = {}
-        cart_keys = redis_client.keys("cart:CART-*")
-        
-        for key in cart_keys:
-            cart_data = redis_client.hgetall(key)
-            events = json.loads(cart_data.get("events", "[]"))
-            
-            for event in events:
-                if event['event_type'] in ['checkout', 'partial_checkout']:
-                    category = event.get('category', 'Unknown')
-                    main_category = category.split('|')[0] if '|' in category else category
-                    revenue = event.get('revenue', 0)
-                    category_sales[main_category] = category_sales.get(main_category, 0) + revenue
-        
-        if not category_sales:
-            print("[VIZ] No hay datos de categorías")
-            return
-        
-        # Top 10 categorías
-        top_categories = sorted(category_sales.items(), key=lambda x: x[1], reverse=True)[:10]
-        categories = [c[0][:30] for c in top_categories]
-        revenues = [c[1] for c in top_categories]
-        
-        plt.figure(figsize=(12, 6))
-        bars = plt.bar(range(len(categories)), revenues, color="coral")
-        plt.xticks(range(len(categories)), categories, rotation=45, ha='right')
-        plt.ylabel("Revenue Total (₹)")
-        plt.title("Top 10 Categorías Más Vendidas - Cyber Day")
-        
-        # Agregar valores en las barras
-        for bar in bars:
-            height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height,
-                    f'₹{int(height):,}',
-                    ha='center', va='bottom', fontsize=8)
-        
-        plt.tight_layout()
-        plt.savefig("data/processed/top_categories.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] ✅ Gráfico guardado: top_categories.png")
-        plt.close()
-
-        redis_client.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en categorías: {e}")
-
-
-def plot_lost_revenue_breakdown():
-    """Gráfico de ingresos perdidos por categoría."""
-    try:
-        redis_client = get_redis_connection()
-        
-        if redis_client is None:
-            return
-
-        # Obtener pérdidas por categoría
-        lost_by_category = {}
-        cart_keys = redis_client.keys("cart:CART-*")
-        
-        for key in cart_keys:
-            cart_data = redis_client.hgetall(key)
-            events = json.loads(cart_data.get("events", "[]"))
-            
-            for event in events:
-                lost = event.get('lost_revenue', 0)
-                if lost > 0:
-                    category = event.get('category', 'Unknown')
-                    main_category = category.split('|')[0] if '|' in category else category
-                    lost_by_category[main_category] = lost_by_category.get(main_category, 0) + lost
-        
-        if not lost_by_category:
-            print("[VIZ] No hay pérdidas registradas")
-            return
-        
-        # Top 10
-        top_lost = sorted(lost_by_category.items(), key=lambda x: x[1], reverse=True)[:10]
-        categories = [c[0][:25] for c in top_lost]
-        losses = [c[1] for c in top_lost]
-        
-        plt.figure(figsize=(10, 6))
-        plt.barh(categories, losses, color="#e74c3c")
-        plt.xlabel("Ingresos Perdidos (₹)")
-        plt.title("Top 10 Categorías con Mayores Pérdidas - Cyber Day")
-        plt.tight_layout()
-        plt.savefig("data/processed/lost_revenue_by_category.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] ✅ Gráfico guardado: lost_revenue_by_category.png")
-        plt.close()
-
-        redis_client.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en pérdidas: {e}")
-
-
-def plot_stock_out_times():
-    """Gráfico de tiempos de agotamiento."""
-    try:
-        redis_client = get_redis_connection()
-        
-        if redis_client is None:
-            return
-
-        stock_out_keys = redis_client.keys("stock_out:*")
-        
-        if not stock_out_keys:
-            print("[VIZ] No hay productos agotados")
-            return
-        
-        times = []
-        names = []
-        
-        for key in stock_out_keys[:15]:  # Top 15 más rápidos
-            data = redis_client.hgetall(key)
-            duration_min = float(data.get('duration_seconds', 0)) / 60
-            name = data.get('product_name', 'Unknown')[:35]
-            
-            times.append(duration_min)
-            names.append(name)
-        
-        # Ordenar por tiempo ascendente
-        sorted_data = sorted(zip(times, names))
-        times = [t for t, _ in sorted_data]
-        names = [n for _, n in sorted_data]
-        
-        plt.figure(figsize=(12, 8))
-        bars = plt.barh(names, times, color="#f39c12")
-        plt.xlabel("Tiempo hasta Agotarse (minutos)")
-        plt.title("Productos Más Cotizados (se agotaron más rápido)")
-        
-        # Agregar valores
-        for bar in bars:
-            width = bar.get_width()
-            plt.text(width, bar.get_y() + bar.get_height()/2.,
-                    f'{width:.1f} min',
-                    ha='left', va='center', fontsize=8)
-        
-        plt.tight_layout()
-        plt.savefig("data/processed/stock_out_times.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] ✅ Gráfico guardado: stock_out_times.png")
-        plt.close()
-
-        redis_client.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en tiempos de agotamiento: {e}")
-
-
-def plot_revenue_comparison():
-    """Gráfico comparativo: ingresos vs pérdidas."""
-    try:
-        redis_client = get_redis_connection()
-        
-        if redis_client is None:
-            return
-
-        cart_keys = redis_client.keys("cart:CART-*")
-        total_revenue = 0
-        total_lost = 0
-
-        for key in cart_keys:
-            cart_data = redis_client.hgetall(key)
-            revenue = float(cart_data.get("total_revenue", 0))
-            lost = float(cart_data.get("lost_revenue", 0))
-
-            total_revenue += revenue
-            lost_revenue += lost
-
-            if revenue > 0:
-                revenue_by_cart.append(revenue)
-
-        if total_revenue == 0 and total_lost == 0:
-            print("[VIZ] No hay datos de ingresos")
-            return
-
-        # Crear directorio si no existe
-        Path("docs/images").mkdir(parents=True, exist_ok=True)
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-
-        # Gráfico 1: Ingresos vs Perdidos
-        ax1.bar(["Ingresos", "Perdidos"], [total_revenue, lost_revenue], color=["#27ae60", "#e74c3c"])
-        ax1.set_ylabel("Rupias")
-        ax1.set_title("Ingresos Totales vs Perdidos - Amazon")
-        for i, v in enumerate([total_revenue, lost_revenue]):
-            ax1.text(i, v + 100, f"${v:.0f}", ha="center", va="bottom", fontweight="bold")
-
-        # Gráfico 2: Pie chart
-        total = total_revenue + total_lost
-        percentages = [total_revenue/total*100, total_lost/total*100]
-        
-        ax2.pie(percentages, labels=categories, colors=colors,
-                autopct='%1.1f%%', startangle=90)
-        ax2.set_title("Distribución de Ingresos Potenciales")
-
-        plt.tight_layout()
-        plt.savefig("docs/images/revenue_metrics.png", dpi=100, bbox_inches="tight")
-        print("[VIZ] Gráfico guardado: docs/images/revenue_metrics.png")
-        plt.close()
-
-        redis_client.close()
-
-    except Exception as e:
-        print(f"[VIZ] Error en comparación de ingresos: {e}")
-
-
-def generate_all_visualizations():
-    """Genera todas las visualizaciones."""
-    print("\n[VIZ] Generando visualizaciones del Cyberday Amazon...\n")
-
-    plot_product_categories_distribution()
-    plot_price_distribution()
-    plot_cart_events_timeline()
-    plot_revenue_metrics()
-
-    print("\n[VIZ] Todas las visualizaciones completadas\n")
-
-
-"""
-Visualizaciones para analisis del Cyberday: MongoDB + Redis.
+Visualization for Cyberday analysis: MongoDB + Redis.
 """
 
 import json
@@ -370,13 +10,13 @@ import matplotlib.pyplot as plt
 from src.config import get_mongo_connection, get_redis_connection
 
 
-# Directorio de salida para las imagenes
+# Output directory for images
 OUTPUT_DIR = Path("data/processed")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def plot_product_categories_distribution():
-    """Grafico de distribucion de productos por categoria."""
+    """Chart of product distribution by category."""
     try:
         mongo_client, _, collection = get_mongo_connection()
         if collection is None:
@@ -390,30 +30,30 @@ def plot_product_categories_distribution():
 
         results = list(collection.aggregate(pipeline))
         if not results:
-            print("[VIZ] No hay datos de productos")
+            print("[VIZ] No product data found")
             return
 
-        categories = [r.get("_id", "Sin categoria") for r in results]
+        categories = [r.get("_id", "No Category") for r in results]
         counts = [r["count"] for r in results]
 
         plt.figure(figsize=(12, 6))
         plt.barh(categories, counts, color="steelblue")
-        plt.xlabel("Cantidad de productos")
-        plt.title("Top 15 categorias por cantidad de productos - Amazon")
+        plt.xlabel("Number of Products")
+        plt.title("Top 15 Categories by Product Count - Amazon")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "categories_distribution.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         mongo_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en grafico de categorias: {e}")
+        print(f"[VIZ] Error in category chart: {e}")
 
 
 def plot_price_distribution():
-    """Grafico de distribucion de precios."""
+    """Chart of price distribution."""
     try:
         mongo_client, _, collection = get_mongo_connection()
         if collection is None:
@@ -426,28 +66,28 @@ def plot_price_distribution():
         ]
 
         if not prices:
-            print("[VIZ] No hay datos de precios")
+            print("[VIZ] No price data found")
             return
 
         plt.figure(figsize=(12, 6))
         plt.hist(prices, bins=50, color="coral", edgecolor="black", alpha=0.7)
-        plt.xlabel("Precio descontado")
-        plt.ylabel("Cantidad de productos")
-        plt.title("Distribucion de precios - Amazon")
+        plt.xlabel("Discounted Price")
+        plt.ylabel("Number of Products")
+        plt.title("Price Distribution - Amazon")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "price_distribution.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         mongo_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en distribucion de precios: {e}")
+        print(f"[VIZ] Error in price distribution: {e}")
 
 
 def plot_cart_events_timeline():
-    """Grafico de eventos de carrito por tipo."""
+    """Chart of cart events by type."""
     try:
         redis_client = get_redis_connection()
         if redis_client is None:
@@ -471,29 +111,29 @@ def plot_cart_events_timeline():
 
         total_events = sum(events_by_type.values())
         if total_events == 0:
-            print("[VIZ] No hay eventos de carrito")
+            print("[VIZ] No cart events found")
             return
 
         plt.figure(figsize=(10, 6))
         colors = ["#2ecc71", "#3498db", "#e74c3c", "#f39c12", "#9b59b6"]
         plt.bar(events_by_type.keys(), events_by_type.values(), color=colors[: len(events_by_type)])
-        plt.xlabel("Tipo de evento")
-        plt.ylabel("Cantidad de eventos")
-        plt.title("Eventos de carrito - Cyberday Amazon")
+        plt.xlabel("Event Type")
+        plt.ylabel("Number of Events")
+        plt.title("Cart Events - Amazon Cyberday")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "cart_events.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en eventos de carrito: {e}")
+        print(f"[VIZ] Error in cart events: {e}")
 
 
 def plot_top_selling_products():
-    """Grafico de productos mas vendidos."""
+    """Chart of top selling products."""
     try:
         redis_client = get_redis_connection()
         mongo_client, _, collection = get_mongo_connection()
@@ -516,7 +156,7 @@ def plot_top_selling_products():
                         sales[product_id] = sales.get(product_id, 0) + quantity
 
         if not sales:
-            print("[VIZ] No hay ventas registradas")
+            print("[VIZ] No sales recorded")
             return
 
         top_products = sorted(sales.items(), key=lambda x: x[1], reverse=True)[:15]
@@ -532,23 +172,23 @@ def plot_top_selling_products():
 
         plt.figure(figsize=(12, 8))
         plt.barh(product_names, quantities, color="steelblue")
-        plt.xlabel("Unidades vendidas")
-        plt.title("Top 15 productos mas vendidos - Cyber Day")
+        plt.xlabel("Units Sold")
+        plt.title("Top 15 Best-Selling Products - Cyber Day")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "top_selling_products.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
         mongo_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en productos mas vendidos: {e}")
+        print(f"[VIZ] Error in top selling products: {e}")
 
 
 def plot_top_categories():
-    """Grafico de categorias mas vendidas."""
+    """Chart of top selling categories."""
     try:
         redis_client = get_redis_connection()
         if redis_client is None:
@@ -569,7 +209,7 @@ def plot_top_categories():
                     category_sales[main_category] = category_sales.get(main_category, 0) + revenue
 
         if not category_sales:
-            print("[VIZ] No hay datos de categorias")
+            print("[VIZ] No category data found")
             return
 
         top_categories = sorted(category_sales.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -579,15 +219,15 @@ def plot_top_categories():
         plt.figure(figsize=(12, 6))
         bars = plt.bar(range(len(categories)), revenues, color="coral")
         plt.xticks(range(len(categories)), categories, rotation=45, ha="right")
-        plt.ylabel("Revenue total (₹)")
-        plt.title("Top 10 categorias mas vendidas - Cyber Day")
+        plt.ylabel("Total Revenue (Rupees)")
+        plt.title("Top 10 Best-Selling Categories - Cyber Day")
 
         for bar in bars:
             height = bar.get_height()
             plt.text(
                 bar.get_x() + bar.get_width() / 2.0,
                 height,
-                f"₹{int(height):,}",
+                f"R{int(height):,}",
                 ha="center",
                 va="bottom",
                 fontsize=8,
@@ -596,17 +236,17 @@ def plot_top_categories():
         plt.tight_layout()
         output_path = OUTPUT_DIR / "top_categories.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en categorias: {e}")
+        print(f"[VIZ] Error in top categories: {e}")
 
 
 def plot_lost_revenue_breakdown():
-    """Grafico de ingresos perdidos por categoria."""
+    """Chart of lost revenue by category."""
     try:
         redis_client = get_redis_connection()
         if redis_client is None:
@@ -627,7 +267,7 @@ def plot_lost_revenue_breakdown():
                     lost_by_category[main_category] = lost_by_category.get(main_category, 0) + lost
 
         if not lost_by_category:
-            print("[VIZ] No hay perdidas registradas")
+            print("[VIZ] No lost revenue recorded")
             return
 
         top_lost = sorted(lost_by_category.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -636,22 +276,22 @@ def plot_lost_revenue_breakdown():
 
         plt.figure(figsize=(10, 6))
         plt.barh(categories, losses, color="#e74c3c")
-        plt.xlabel("Ingresos perdidos (₹)")
-        plt.title("Top 10 categorias con mayores perdidas - Cyber Day")
+        plt.xlabel("Lost Revenue (Rupees)")
+        plt.title("Top 10 Categories with Highest Lost Revenue - Cyber Day")
         plt.tight_layout()
         output_path = OUTPUT_DIR / "lost_revenue_by_category.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en perdidas: {e}")
+        print(f"[VIZ] Error in lost revenue chart: {e}")
 
 
 def plot_stock_out_times():
-    """Grafico de tiempos de agotamiento."""
+    """Chart of stock-out times."""
     try:
         redis_client = get_redis_connection()
         if redis_client is None:
@@ -660,7 +300,7 @@ def plot_stock_out_times():
         stock_out_keys = redis_client.keys("stock_out:*")
 
         if not stock_out_keys:
-            print("[VIZ] No hay productos agotados")
+            print("[VIZ] No products out of stock")
             return
 
         times = []
@@ -674,23 +314,23 @@ def plot_stock_out_times():
             times.append(duration_seconds)
             names.append(name)
 
-        # Eliminar duplicados: mantener solo el más rápido por nombre
+        # Build unique product map
         unique_products = {}
-        for time, name in zip(times, names):
-            if name not in unique_products or time < unique_products[name]:
-                unique_products[name] = time
+        for time_val, name in zip(times, names):
+            if name not in unique_products or time_val < unique_products[name]:
+                unique_products[name] = time_val
         
-        # Ordenar y tomar top 15
+        # Sort and take top 15
         sorted_data = sorted(unique_products.items(), key=lambda x: x[1])[:15]
         times = [t for _, t in sorted_data]
         names = [n for n, _ in sorted_data]
 
         plt.figure(figsize=(12, 8))
-        # Convertir a horas para el eje X
+        # Convert to hours for X axis
         times_hours = [t / 3600 for t in times]
         bars = plt.barh(names, times_hours, color="#f39c12")
-        plt.xlabel("Tiempo hasta agotarse (horas)")
-        plt.title("Productos mas cotizados (se agotaron mas rapido)")
+        plt.xlabel("Time until Stock Out (hours)")
+        plt.title("Most Sought-After Products (Sold Out Fastest)")
 
         for bar, seconds in zip(bars, times):
             width = bar.get_width()
@@ -708,17 +348,17 @@ def plot_stock_out_times():
         plt.tight_layout()
         output_path = OUTPUT_DIR / "stock_out_times.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en tiempos de agotamiento: {e}")
+        print(f"[VIZ] Error in stock out times: {e}")
 
 
 def plot_revenue_comparison():
-    """Grafico comparativo: ingresos vs perdidas."""
+    """Comparative chart: Revenue vs Lost Revenue."""
     try:
         redis_client = get_redis_connection()
 
@@ -735,25 +375,25 @@ def plot_revenue_comparison():
             total_lost += float(cart_data.get("lost_revenue", 0))
 
         if total_revenue == 0 and total_lost == 0:
-            print("[VIZ] No hay datos de ingresos")
+            print("[VIZ] No revenue data found")
             return
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-        categories = ["Ingresos\nObtenidos", "Ingresos\nPerdidos"]
+        categories = ["Revenue\nEarned", "Revenue\nLost"]
         values = [total_revenue, total_lost]
         colors = ["#27ae60", "#e74c3c"]
 
         bars = ax1.bar(categories, values, color=colors, alpha=0.7)
-        ax1.set_ylabel("Rupias (₹)")
-        ax1.set_title("Ingresos totales vs perdidos")
+        ax1.set_ylabel("Rupees (₹)")
+        ax1.set_title("Total Revenue vs Lost Revenue")
 
         for bar in bars:
             height = bar.get_height()
             ax1.text(
                 bar.get_x() + bar.get_width() / 2.0,
                 height,
-                f"₹{int(height):,}",
+                f"R{int(height):,}",
                 ha="center",
                 va="bottom",
                 fontweight="bold",
@@ -763,23 +403,23 @@ def plot_revenue_comparison():
         percentages = [total_revenue / total * 100, total_lost / total * 100]
 
         ax2.pie(percentages, labels=categories, colors=colors, autopct="%1.1f%%", startangle=90)
-        ax2.set_title("Distribucion de ingresos potenciales")
+        ax2.set_title("Potential Revenue Distribution")
 
         plt.tight_layout()
         output_path = OUTPUT_DIR / "revenue_comparison.png"
         plt.savefig(output_path, dpi=100, bbox_inches="tight")
-        print(f"[VIZ] Grafico guardado: {output_path}")
+        print(f"[VIZ] Chart saved: {output_path}")
         plt.close()
 
         redis_client.close()
 
     except Exception as e:
-        print(f"[VIZ] Error en comparacion de ingresos: {e}")
+        print(f"[VIZ] Error in revenue comparison: {e}")
 
 
 def generate_all_visualizations():
-    """Genera todas las visualizaciones."""
-    print("\n[VIZ] Generando visualizaciones del Cyberday...\n")
+    """Generates all visualizations."""
+    print("\n[VIZ] Generating Cyberday visualizations...\n")
 
     plot_product_categories_distribution()
     plot_price_distribution()
@@ -790,7 +430,7 @@ def generate_all_visualizations():
     plot_stock_out_times()
     plot_revenue_comparison()
 
-    print("\n[VIZ] Todas las visualizaciones completadas\n")
+    print("\n[VIZ] All visualizations completed\n")
 
 
 if __name__ == "__main__":
